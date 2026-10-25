@@ -1,0 +1,174 @@
+screen_id: random_play
+area_patches:
+  昨日账本:
+    lcs_percent: 0.9
+    pc_rect:
+    - 500
+    - 195
+    - 850
+    - 295
+  开始营业:
+    lcs_percent: 0.9
+    pc_rect:
+    - 1520
+    - 860
+    - 1845
+    - 955
+  正在营业:
+    lcs_percent: 0.9
+    pc_rect:
+    - 1520
+    - 860
+    - 1845
+    - 955
+added_areas:
+- area_name: 手柄-关闭昨日账本
+  area_type: text
+  pc_rect:
+  - 830
+  - 900
+  - 1130
+  - 990
+  text: 返回
+  lcs_percent: 0.9
+- area_name: 手柄-经营状况页
+  area_type: text
+  pc_rect:
+  - 1190
+  - 0
+  - 1920
+  - 105
+  text: 经营状况
+  lcs_percent: 0.9
+- area_name: 手柄-开始营业
+  area_type: text
+  pc_rect:
+  - 1520
+  - 860
+  - 1845
+  - 955
+  text: 开始营业
+  lcs_percent: 0.9
+- area_name: 手柄-宣传员入口
+  area_type: text
+  pc_rect:
+  - 1600
+  - 990
+  - 1920
+  - 1080
+  text: 选择
+  lcs_percent: 0.9
+- area_name: 手柄-录像带入口
+  area_type: text
+  pc_rect:
+  - 1600
+  - 990
+  - 1920
+  - 1080
+  text: 选择
+  lcs_percent: 0.9
+- area_name: 手柄-返回经营页面
+  area_type: text
+  pc_rect:
+  - 1600
+  - 990
+  - 1920
+  - 1080
+  text: 返回
+  lcs_percent: 0.9
+- area_name: 手柄-经营卡片
+  area_type: none
+  pc_rect:
+  - 850
+  - 555
+  - 1815
+  - 860
+- area_name: 手柄-宣传员列表
+  area_type: none
+  pc_rect:
+  - 510
+  - 105
+  - 1815
+  - 975
+- area_name: 手柄-宣传员列表标题
+  area_type: text
+  pc_rect:
+  - 50
+  - 985
+  - 455
+  - 1075
+  text: 选择宣传员
+  lcs_percent: 0.9
+- area_name: 手柄-确认宣传员
+  area_type: text
+  pc_rect:
+  - 1600
+  - 985
+  - 1920
+  - 1080
+  text: 确定
+  lcs_percent: 0.9
+- area_name: 手柄-返回宣传员列表
+  area_type: text
+  pc_rect:
+  - 1600
+  - 985
+  - 1920
+  - 1080
+  text: 返回
+  lcs_percent: 0.9
+- area_name: 手柄-录像带列表标题
+  area_type: text
+  pc_rect:
+  - 40
+  - 985
+  - 420
+  - 1075
+  text: 选择匹配的录像带
+  lcs_percent: 0.9
+- area_name: 手柄-推荐上架
+  area_type: text
+  pc_rect:
+  - 1410
+  - 985
+  - 1920
+  - 1080
+  text: 推荐上架
+  lcs_percent: 0.9
+- area_name: 手柄-返回录像带列表
+  area_type: text
+  pc_rect:
+  - 1410
+  - 985
+  - 1920
+  - 1080
+  text: 返回
+  lcs_percent: 0.9
+- area_name: 手柄-卡片标题
+  area_type: none
+  pc_rect:
+  - 830
+  - 480
+  - 1855
+  - 620
+- area_name: 手柄-当日主题
+  area_type: none
+  pc_rect:
+  - 840
+  - 75
+  - 1220
+  - 220
+- area_name: 手柄-主题完成标记
+  area_type: none
+  pc_rect:
+  - 920
+  - 85
+  - 1205
+  - 138
+- area_name: 手柄-营业确认弹窗
+  area_type: none
+  pc_rect:
+  - 640
+  - 460
+  - 1300
+  - 755

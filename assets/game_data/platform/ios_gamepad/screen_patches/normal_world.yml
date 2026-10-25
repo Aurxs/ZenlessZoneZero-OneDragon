@@ -1,0 +1,9 @@
+screen_id: normal_world
+added_areas:
+- area_name: 手柄-对话选项带
+  area_type: none
+  pc_rect:
+  - 1340
+  - 490
+  - 1920
+  - 815
