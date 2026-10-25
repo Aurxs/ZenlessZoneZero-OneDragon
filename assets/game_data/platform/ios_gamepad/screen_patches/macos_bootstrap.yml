@@ -26,22 +26,22 @@ screen:
     pc_rect:
     - 410
     - 200
-    - 690
-    - 325
+    - 710
+    - 350
   - area_name: 输入-当前布局
     area_type: none
     pc_rect:
     - 1290
     - 195
     - 1810
-    - 322
+    - 350
   - area_name: 输入-布局选项
     area_type: none
     pc_rect:
     - 1400
-    - 335
+    - 350
     - 1810
-    - 505
+    - 530
   - area_name: 设置-侧栏
     area_type: none
     pc_rect:
@@ -54,8 +54,8 @@ screen:
     pc_rect:
     - 170
     - 250
-    - 315
-    - 370
+    - 330
+    - 410
   - area_name: 手柄-返回提示
     area_type: none
     pc_rect:
@@ -87,3 +87,51 @@ screen:
     template_sub_dir: ios_gamepad
     template_id: bootstrap_touch_camera
     template_match_threshold: 0.9
+  - area_name: 登录-触屏设置
+    area_type: template
+    pc_rect:
+    - 1752
+    - 716
+    - 1842
+    - 806
+    template_sub_dir: ios_gamepad
+    template_id: bootstrap_touch_login_settings
+    template_match_threshold: 0.9
+  - area_name: 登录-手柄进入提示
+    area_type: template
+    pc_rect:
+    - 797
+    - 972
+    - 851
+    - 1026
+    template_sub_dir: ios_gamepad
+    template_id: bootstrap_login_gamepad_enter
+    template_match_threshold: 0.9
+  - area_name: 登录-触屏主提示
+    area_type: none
+    pc_rect:
+    - 830
+    - 835
+    - 1090
+    - 925
+  - area_name: 登录-手柄主提示
+    area_type: none
+    pc_rect:
+    - 900
+    - 965
+    - 1080
+    - 1030
+  - area_name: 登录-凭据提示
+    area_type: none
+    pc_rect:
+    - 450
+    - 150
+    - 1450
+    - 930
+  - area_name: 登录-返回提示
+    area_type: none
+    pc_rect:
+    - 1765
+    - 1005
+    - 1810
+    - 1045

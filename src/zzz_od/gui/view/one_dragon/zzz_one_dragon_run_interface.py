@@ -45,16 +45,17 @@ class ZOneDragonRunInterface(OneDragonRunInterface):
             return top
         self.macos_status_label: BodyLabel = BodyLabel(
             f'{MACOS_CHARGE_PLAN_LIMITS}。其他任务标记为「Mac暂未适配」；'
-            '可先检查并切换手柄，不运行任务列表。'
+            '准备游戏会按需启动游戏、进入已保存账号并确认手柄模式。'
             '触屏模式下会短暂置前游戏并使用鼠标，切手柄后恢复。',
         )
         self.macos_status_label.setWordWrap(True)
         top.layout().addWidget(self.macos_status_label)
         self.macos_prepare_btn: PushButton = PushButton(
-            text='准备游戏（检查并切换手柄）', icon=FluentIcon.GAME,
+            text='准备游戏（启动并切换手柄）', icon=FluentIcon.GAME,
         )
         self.macos_prepare_btn.setToolTip(
-            '只准备游戏和确认手柄大世界，不执行任务、不消耗电量。'
+            '游戏未运行时自动启动，进入已保存账号并确认手柄大世界。'
+            '不执行任务、不消耗电量；需要重新登录时会停止提示。'
             '触屏模式下会短暂置前游戏并使用鼠标，切手柄后恢复。'
         )
         self.macos_prepare_btn.clicked.connect(self._on_prepare_game_clicked)

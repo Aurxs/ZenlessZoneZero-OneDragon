@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from one_dragon.base.controller.drag_timing import DragTiming
     from one_dragon.base.controller.gamepad_input import GamepadInput
+    from one_dragon.base.controller.macos.macos_game_launcher import MacGameLauncher
     from one_dragon.base.controller.macos.macos_window_capture import MacWindowCapture
     from one_dragon.base.controller.macos.sck_frame_converter import CapturedFrame
     from one_dragon.base.geometry.point import Point
@@ -41,6 +42,7 @@ class ZMacController(ControllerBase):
         standard_height: int = 1080,
         gamepad: GamepadInput | None = None,
         window_capture: MacWindowCapture | None = None,
+        game_launcher: MacGameLauncher | None = None,
     ) -> None:
         """只构造服务，开始运行前才连接输入和申请窗口采集。"""
         super().__init__(max_screenshot_cnt=10)
@@ -81,6 +83,18 @@ class ZMacController(ControllerBase):
             window_capture = MacWindowCapture()
         self.gamepad: GamepadInput = gamepad
         self.window_capture: MacWindowCapture = window_capture
+        if game_launcher is None:
+            from one_dragon.base.controller.macos.macos_game_launcher import (
+                MacGameLauncher,
+            )
+
+            game_launcher = MacGameLauncher(
+                window_capture, macos_config.bundle_id, app_path=macos_config.app_path,
+                window_title=macos_config.window_title,
+                timeout_seconds=macos_config.launch_timeout_seconds,
+            )
+        self.game_launcher: MacGameLauncher = game_launcher
+        self._started_game_this_run: bool = False
         self.is_moving: bool = False
         self._input_paused: bool = True
         self._monitor_stop: threading.Event | None = None
@@ -159,28 +173,23 @@ class ZMacController(ControllerBase):
         """返回窗口是否已绑定且采集没有报告错误。"""
         return self.window_capture.window is not None and self.window_capture.last_error is None
 
+    @property
+    def started_game_this_run(self) -> bool:
+        """仅本次确实请求冷启动并找到窗口时为真，供登录准备区分等待策略。"""
+        return self._started_game_this_run
+
     def init_before_context_run(self) -> bool:
         """绑定唯一目标窗口，拿到有效帧后再连接输入并恢复运行。"""
         self.run_generation += 1
         self.cleanup_after_app_shutdown()
         try:
-            windows = self.window_capture.list_windows(self.macos_config.bundle_id)
-            if self.macos_config.window_title:
-                windows = [window for window in windows if window.title == self.macos_config.window_title]
-            else:
-                windows = [window for window in windows if window.width >= 320 and window.height >= 180]
-                if windows:
-                    largest_area = max(window.width * window.height for window in windows)
-                    windows = [window for window in windows if window.width * window.height == largest_area]
-            if len(windows) != 1:
-                raise RuntimeError(
-                    f'无法确定唯一游戏窗口（候选 {len(windows)} 个）。'
-                    '请在 PlayCover 中打开游戏并进入大世界、选择手柄模式；多个窗口时配置唯一窗口标题'
-                )
-            if windows[0].width < 320 or windows[0].height < 180:
-                raise RuntimeError('目标窗口尺寸过小，请打开正常尺寸的游戏窗口')
+            # 游戏启动时就需要能发现虚拟手柄；有效新帧出现前始终禁止按键。
+            self.gamepad.connect()
+            self.gamepad.suspend()
+            window = self.game_launcher.ensure_window()
+            self._started_game_this_run = self.game_launcher.started_game
             self.window_capture.start(
-                windows[0], fps=self.macos_config.capture_fps,
+                window, fps=self.macos_config.capture_fps,
                 top_inset_pixels=self.macos_config.capture_top_inset_pixels,
             )
             deadline = time.monotonic() + 2.0
@@ -188,7 +197,6 @@ class ZMacController(ControllerBase):
                 if self.window_capture.last_error or time.monotonic() >= deadline:
                     raise RuntimeError(self.window_capture.last_error or '尚未采集到有效游戏画面')
                 time.sleep(0.02)
-            self.gamepad.connect()
             self.resume_input()
             return True
         except Exception:
@@ -225,6 +233,7 @@ class ZMacController(ControllerBase):
     def cleanup_after_app_shutdown(self) -> None:
         """关闭输入并停止采集，实例切换后不保留旧窗口或旧按键。"""
         self._input_paused = True
+        self._started_game_this_run = False
         self._battle_input_scope = None
         self.is_moving = False
         try:

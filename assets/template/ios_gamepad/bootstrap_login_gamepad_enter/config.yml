@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: bootstrap_login_gamepad_enter
+template_name: 手柄登录页进入提示
+template_shape: circle
+auto_mask: true
+point_list:
+- 824, 999
+- 841, 999

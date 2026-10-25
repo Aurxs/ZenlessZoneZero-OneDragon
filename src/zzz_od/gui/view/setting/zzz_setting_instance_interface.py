@@ -30,6 +30,8 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         self.ctx: ZContext = ctx
         self.platform_opt: ComboBoxSettingCard | None = None
         self.macos_bundle_opt: TextSettingCard | None = None
+        self.macos_app_path_opt: TextSettingCard | None = None
+        self.macos_launch_timeout_opt: SpinBoxSettingCard | None = None
         self.macos_ojd_opt: TextSettingCard | None = None
         self.macos_top_inset_opt: SpinBoxSettingCard | None = None
         super().__init__(ctx=ctx, parent=parent)
@@ -52,6 +54,18 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         )
         self.macos_bundle_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_bundle_opt)
+        self.macos_app_path_opt = TextSettingCard(
+            icon=FluentIcon.FOLDER, title='PlayCover 游戏路径',
+            content='完整 .app 路径；留空按应用标识使用 PlayCover 默认安装目录',
+        )
+        self.macos_app_path_opt.value_changed.connect(self._on_mac_config_changed)
+        group.addSettingCard(self.macos_app_path_opt)
+        self.macos_launch_timeout_opt = SpinBoxSettingCard(
+            icon=FluentIcon.HISTORY, title='启动窗口等待（秒）', minimum=1, maximum=120,
+            content='未运行时先连接中立手柄再启动，默认等待45秒；已有进程不会重启',
+        )
+        self.macos_launch_timeout_opt.value_changed.connect(self._on_mac_config_changed)
+        group.addSettingCard(self.macos_launch_timeout_opt)
         self.macos_ojd_opt = TextSettingCard(
             icon=FluentIcon.FOLDER, title='OJD 命令路径',
             content='填写 ojd 或其完整路径，命令名必须为 ojd',
@@ -66,7 +80,7 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         group.addSettingCard(self.macos_top_inset_opt)
         group.addSettingCard(HelpCard(
             title='Mac 当前支持范围',
-            content='先在 PlayCover 中进入游戏并选择手柄模式；自动登录和完整一条龙流程尚未适配。',
+            content='准备游戏会按需启动已安装的客户端；凭据或验证码需要人工处理，完整每日流程仍在适配。',
         ))
         return group
 
@@ -77,6 +91,10 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
             return
         self.platform_opt.init_with_adapter(self.ctx.game_account_config.get_prop_adapter('platform'))
         self.macos_bundle_opt.init_with_adapter(self.ctx.macos_config.get_prop_adapter('bundle_id'))
+        self.macos_app_path_opt.init_with_adapter(self.ctx.macos_config.get_prop_adapter('app_path'))
+        self.macos_launch_timeout_opt.init_with_adapter(
+            self.ctx.macos_config.get_prop_adapter('launch_timeout_seconds'),
+        )
         self.macos_ojd_opt.init_with_adapter(self.ctx.macos_config.get_prop_adapter('ojd_cli_path'))
         self.macos_top_inset_opt.init_with_adapter(
             self.ctx.macos_config.get_prop_adapter('capture_top_inset_pixels'),

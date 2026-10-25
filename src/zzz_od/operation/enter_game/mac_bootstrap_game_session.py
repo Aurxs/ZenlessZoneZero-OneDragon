@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class MacBootstrapGameSession(Operation):
-    """只准备已打开的会话，成功前必须看见手柄大世界。"""
+    """准备已采集的会话及已保存账号登录，成功前必须看见手柄大世界。"""
 
     SCREEN_NAME: ClassVar[str] = 'Mac启动'
 
@@ -39,6 +39,10 @@ class MacBootstrapGameSession(Operation):
         self._unknown_frames: int = 0
         self._gamepad_confirmed: bool = False
         self._area_ocr: dict[str, dict[str, MatchResultList]] = {}
+        self._timing_initialized: bool = False
+        self._cold_start: bool = False
+        self._startup_wait_until: float | None = None
+        self._login_wait_until: float | None = None
 
     def handle_init(self) -> None:
         """每次顶层应用重新识别模式，不沿用上次运行的确认结果。"""
@@ -48,6 +52,15 @@ class MacBootstrapGameSession(Operation):
         self._unknown_frames = 0
         self._gamepad_confirmed = False
         self._area_ocr.clear()
+        self._initialize_timing()
+
+    def _initialize_timing(self) -> None:
+        """仅本次确实启动游戏时放行有限的被动等待，不放宽点击条件。"""
+        self._cold_start = getattr(self.ctx.controller, 'started_game_this_run', False) is True
+        self._startup_wait_until = time.time() + 60 if self._cold_start else None
+        self._login_wait_until = None
+        self.timeout_seconds = 155 if self._cold_start else 35
+        self._timing_initialized = True
 
     def _read_area(self, name: str) -> dict[str, MatchResultList]:
         """只读取平台已建档区域，每轮每个区域最多识别一次。"""
@@ -101,6 +114,7 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail('准备已暂停或停止，未发送启动输入')
         if action in self._sent_actions:
             return self._wait_after_action(action)
+        self._startup_wait_until = None
         self._sent_actions.add(action)
         # 画面可能在鼠标恢复前已经更新，不能要求静态 UI 再生成一帧。
         self._last_action_time = time.time()
@@ -138,10 +152,11 @@ class MacBootstrapGameSession(Operation):
 
     @operation_node(
         name='准备手柄会话', is_start_node=True, screenshot_before_round=False,
-        timeout_seconds=35,
     )
     def prepare_session(self) -> OperationRoundResult:
         """按当帧证据推进，未知画面等待有限次数后失败。"""
+        if not self._timing_initialized:
+            self._initialize_timing()
         if not self.ctx.is_game_window_ready:
             return self.round_fail('未连接 Mac 游戏窗口，请先在 PlayCover 中打开游戏')
         if not self.ctx.controller.gamepad.is_connected:
@@ -152,6 +167,8 @@ class MacBootstrapGameSession(Operation):
         if self.last_screenshot.shape != (1080, 1920, 3):
             return self.round_fail('Mac 启动截图不是标准 1920×1080，未执行启动点击')
         if self.last_screenshot_time <= self._last_action_time:
+            if self._login_wait_until is not None:
+                return self._wait_for_login()
             return self._wait_after_action('启动动作')
         self._area_ocr.clear()
         try:
@@ -160,7 +177,7 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail(str(error))
 
     def _prepare_from_screen(self) -> OperationRoundResult:
-        """只处理已建档的触屏设置路径和手柄返回路径。"""
+        """按正面证据选择手柄登录、触屏设置和返回路径。"""
         if self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册',
         ).is_success:
@@ -169,6 +186,10 @@ class MacBootstrapGameSession(Operation):
 
         if self._area_found('大世界-触屏操作') and self._area_found('大世界-菜单'):
             return self._send_action('打开触屏菜单', area_name='大世界-菜单')
+
+        login_result = self._prepare_login()
+        if login_result is not None:
+            return login_result
 
         if self._has_text('输入-UI布局', 'UI布局'):
             if self._has_text('输入-当前布局', '手柄'):
@@ -188,6 +209,7 @@ class MacBootstrapGameSession(Operation):
         if self._has_text('设置-侧栏', '声音/触觉'):
             if (
                 self._gamepad_confirmed or self._has_text('手柄-返回提示', 'B')
+                or self._has_text('登录-返回提示', 'B')
                 or self._has_text('设置-侧栏', '手柄按键')
             ):
                 self._gamepad_confirmed = True
@@ -200,6 +222,58 @@ class MacBootstrapGameSession(Operation):
                 return self._send_action('返回大世界', gamepad_key='east')
             return self._send_action('打开触屏设置', area_name='菜单-设置')
 
+        return self._wait_for_known_screen()
+
+    def _prepare_login(self) -> OperationRoundResult | None:
+        """只处理已建档的登录就绪页，成对凭据提示出现时停止。"""
+        credential_pairs = (
+            ('输入手机号注册/登录', '验证码'),
+            ('忘记密码', '手机号'),
+            ('忘记密码', '邮箱'),
+            ('扫码登录', '保留登录记录'),
+            ('请在手机上点击', '确认登录'),
+            ('登录其他账号', '进入游戏'),
+            ('用户协议', '隐私政策'),
+        )
+        if any(
+            self._has_text('登录-凭据提示', first)
+            and self._has_text('登录-凭据提示', second)
+            for first, second in credential_pairs
+        ):
+            return self.round_fail('需要完成账号登录或验证，请在游戏中完成后重新准备')
+
+        if (
+            self._area_found('登录-手柄进入提示')
+            and self._has_text('登录-手柄主提示', '进入游戏')
+        ):
+            self._gamepad_confirmed = True
+            if '进入已保存账号' in self._sent_actions:
+                return self._wait_for_login()
+            self._login_wait_until = time.time() + 60
+            self.timeout_seconds = 155 if self._cold_start else 95
+            return self._send_action('进入已保存账号', gamepad_key='south')
+
+        if (
+            self._has_text('登录-触屏主提示', '点击进入游戏')
+            and self._area_found('登录-触屏设置')
+        ):
+            return self._send_action('打开登录设置', area_name='登录-触屏设置')
+        return None
+
+    def _wait_for_login(self) -> OperationRoundResult:
+        """进入一次后最多等六十秒，不重复 A 或用鼠标尝试推进。"""
+        if self._login_wait_until is None or time.time() >= self._login_wait_until:
+            return self.round_fail('进入游戏后等待60秒仍未确认手柄大世界')
+        return self.round_wait('等待登录与场景加载，未重复输入', wait=0.5)
+
+    def _wait_for_known_screen(self) -> OperationRoundResult:
+        """新启动最多等六十秒，热会话仍按八帧未知画面停止。"""
+        if self._login_wait_until is not None:
+            return self._wait_for_login()
+        if self._startup_wait_until is not None:
+            if time.time() >= self._startup_wait_until:
+                return self.round_fail('冷启动等待60秒仍未识别到可继续的登录或游戏画面')
+            return self.round_wait('等待冷启动登录画面，未发送输入', wait=0.5)
         self._unknown_frames += 1
         if self._unknown_frames >= 8:
             return self.round_fail('未识别到已支持的 Mac 启动画面，已停止且未猜测点击')

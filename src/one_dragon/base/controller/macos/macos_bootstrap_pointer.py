@@ -6,6 +6,7 @@ import math
 import threading
 import time
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 from one_dragon.base.controller.macos.macos_window_capture import (
@@ -13,6 +14,11 @@ from one_dragon.base.controller.macos.macos_window_capture import (
     MacWindowCapture,
     _native_api,
 )
+from one_dragon.base.controller.macos.main_thread_dispatch import (
+    MacMainThreadError,
+    perform_on_main_thread,
+)
+from one_dragon.utils.log_utils import log
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,13 +37,6 @@ def _foreground_api() -> Any:
     return AppKit
 
 
-def _main_operation_queue() -> Any:
-    """仅工作线程请求激活时加载 Foundation 的主线程队列。"""
-    import Foundation
-
-    return Foundation.NSOperationQueue.mainQueue()
-
-
 @dataclass(frozen=True)
 class MacBootstrapWindow:
     """本次读取的窗口身份、全局逻辑点边界与像素缩放比例。"""
@@ -51,6 +50,17 @@ class MacBootstrapWindow:
     height: float
     pixels_per_point: float
     on_screen: bool = True
+
+
+@dataclass(frozen=True)
+class MacForegroundSnapshot:
+    """主线程一次读取的活动状态，工作线程不保留可变的 AppKit 进程对象。"""
+
+    target_pid: int
+    target_bundle_id: str | None
+    target_active: bool
+    current_pid: int | None
+    current_bundle_id: str | None
 
 
 def _validate_binding(window: MacWindow, top_inset_pixels: int) -> None:
@@ -305,109 +315,154 @@ class MacBootstrapPointer:
         if result is not None and result != 0:
             raise MacBootstrapError(f'移动启动点击鼠标位置失败：{result}')
 
-    def _is_game_foreground(self, workspace: Any, target: Any) -> bool:
-        """同时核对活动状态与前台进程，避免用户切换后继续点击。"""
-        current = workspace.frontmostApplication()
+    def _foreground_snapshot(
+        self, appkit: Any, target_pid: int, deadline: float | None = None,
+    ) -> MacForegroundSnapshot:
+        """在主线程重新获取进程对象并读取状态，避免后台线程读取旧活动属性。"""
+        snapshots: list[MacForegroundSnapshot] = []
+
+        def read() -> None:
+            """所有动态 AppKit 属性都在同一次主线程回调里读取。"""
+            target = appkit.NSRunningApplication.runningApplicationWithProcessIdentifier_(target_pid)
+            current = appkit.NSWorkspace.sharedWorkspace().frontmostApplication()
+            snapshots.append(MacForegroundSnapshot(
+                target_pid,
+                target.bundleIdentifier() if target is not None else None,
+                bool(target is not None and target.isActive()),
+                int(current.processIdentifier()) if current is not None else None,
+                current.bundleIdentifier() if current is not None else None,
+            ))
+
+        self._perform_on_main_thread(read, deadline if deadline is not None else time.monotonic() + 1)
+        if not snapshots:
+            raise MacBootstrapError('主线程未返回前台状态，未发送启动点击')
+        return snapshots[0]
+
+    def _is_game_foreground(self, appkit: Any) -> bool:
+        """每次使用主线程的新状态，同时确认游戏应用身份和实际前台 PID。"""
+        state = self._foreground_snapshot(appkit, self._window.pid)
         return bool(
-            target.isActive() and current is not None
-            and int(current.processIdentifier()) == self._window.pid
+            state.target_bundle_id == self._window.bundle_id and state.target_active
+            and state.current_pid == self._window.pid
         )
 
     @staticmethod
     def _perform_on_main_thread(action: Callable[[], None], deadline: float) -> None:
         """GUI 工作线程只等待剩余预算，超时回调不能稍后再抢焦点。"""
-        if threading.current_thread() is threading.main_thread():
-            action()
-            return
-        done = threading.Event()
-        cancelled = threading.Event()
-        errors: list[Exception] = []
-
-        def perform() -> None:
-            """在 AppKit 主线程执行一次，取消和超时都不发送激活请求。"""
-            try:
-                if not cancelled.is_set() and time.monotonic() < deadline:
-                    action()
-            except Exception as error:
-                errors.append(error)
-            finally:
-                done.set()
-
-        _main_operation_queue().addOperationWithBlock_(perform)
-        if not done.wait(max(0, deadline - time.monotonic())):
-            cancelled.set()
-            raise MacBootstrapError('等待主线程激活游戏超时，未发送启动点击')
-        if errors:
-            raise MacBootstrapError(f'主线程应用激活失败：{errors[0]}') from errors[0]
+        try:
+            perform_on_main_thread(action, deadline, operation_name='激活游戏')
+        except MacMainThreadError as error:
+            raise MacBootstrapError(str(error)) from error
 
     def _activate_application(
-        self, appkit: Any, workspace: Any, target: Any, expected_current_pid: int | None,
+        self, appkit: Any, target_pid: int, target_bundle_id: str | None,
+        expected_current_pid: int | None,
     ) -> bool:
-        """激活请求在主线程发出，最终结果只以实际活动进程确认。"""
+        """直接请求无效时，对同一已运行应用单次请求打开，仍核对原 PID。"""
         deadline = time.monotonic() + 1
-        requested = False
-        target_pid = int(target.processIdentifier())
+        errors: list[str] = []
 
-        def activate() -> None:
-            """派发期间用户切走时不覆盖；当前应用可主动让出激活权。"""
-            nonlocal requested
+        def request(use_workspace: bool) -> None:
+            """主线程获取新目标，用户切走或目标重建后不再抢焦点。"""
+            target = appkit.NSRunningApplication.runningApplicationWithProcessIdentifier_(target_pid)
+            workspace = appkit.NSWorkspace.sharedWorkspace()
             current = workspace.frontmostApplication()
-            if expected_current_pid is not None and (
-                current is None or int(current.processIdentifier()) != expected_current_pid
-            ):
+            current_pid = int(current.processIdentifier()) if current is not None else None
+            if target is None or target.bundleIdentifier() != target_bundle_id:
+                errors.append('绑定的应用进程已退出或身份改变')
+                return
+            if current_pid not in (expected_current_pid, target_pid):
+                return
+            if use_workspace:
+                url = target.bundleURL()
+                if url is None:
+                    errors.append('绑定的应用没有可用于激活的应用地址')
+                    return
+                configuration = appkit.NSWorkspaceOpenConfiguration.configuration()
+                configuration.setActivates_(True)
+                configuration.setCreatesNewApplicationInstance_(False)
+                configuration.setAllowsRunningApplicationSubstitution_(False)
+                configuration.setPromptsUserIfNeeded_(False)
+                configuration.setAddsToRecentItems_(False)
+
+                def completed(app: Any, error: Any) -> None:
+                    """打开已有应用的完成结果不得指向新 PID。"""
+                    if error is not None:
+                        errors.append('系统拒绝激活已有应用')
+                    elif app is None or int(app.processIdentifier()) != target_pid:
+                        errors.append('系统激活返回的 PID 与绑定进程不一致')
+
+                workspace.openApplicationAtURL_configuration_completionHandler_(url, configuration, completed)
+                log.info('Mac 前台请求 mode=workspace target_pid=%s current_pid=%s', target_pid, current_pid)
                 return
             application = appkit.NSApplication.sharedApplication()
             yield_activation = getattr(application, 'yieldActivationToApplication_', None)
             if application.isActive() and callable(yield_activation):
                 yield_activation(target)
-            # BOOL 只表示请求状态，异步激活仍必须等待实际 PID，而不是立即判失败。
-            target.activateWithOptions_(appkit.NSApplicationActivateIgnoringOtherApps)
-            requested = True
+            accepted = target.activateWithOptions_(appkit.NSApplicationActivateIgnoringOtherApps)
+            log.info(
+                'Mac 前台请求 mode=direct target_pid=%s current_pid=%s accepted=%s',
+                target_pid, current_pid, bool(accepted),
+            )
 
-        self._perform_on_main_thread(activate, deadline)
-        if not requested:
-            return False
-        while time.monotonic() < deadline:
-            current = workspace.frontmostApplication()
-            if target.isActive() and current is not None and int(current.processIdentifier()) == target_pid:
-                return True
-            time.sleep(0.02)
-        current = workspace.frontmostApplication()
-        return bool(target.isActive() and current is not None and int(current.processIdentifier()) == target_pid)
+        last_state: MacForegroundSnapshot | None = None
+        for use_workspace in (False, True):
+            if time.monotonic() >= deadline:
+                break
+            self._perform_on_main_thread(partial(request, use_workspace), deadline)
+            phase_deadline = deadline if use_workspace else min(deadline, time.monotonic() + 0.35)
+            while time.monotonic() < phase_deadline:
+                last_state = self._foreground_snapshot(appkit, target_pid, deadline)
+                if errors:
+                    raise MacBootstrapError(errors[0])
+                if (
+                    last_state.target_bundle_id == target_bundle_id and last_state.target_active
+                    and last_state.current_pid == target_pid
+                ):
+                    return True
+                if last_state.current_pid not in (expected_current_pid, target_pid):
+                    log.warning(
+                        'Mac 激活期间前台改变 target_pid=%s current_pid=%s target_active=%s',
+                        target_pid, last_state.current_pid, last_state.target_active,
+                    )
+                    return False
+                time.sleep(0.02)
+        if last_state is not None:
+            log.warning(
+                'Mac 前台确认失败 target_pid=%s current_pid=%s target_active=%s',
+                target_pid, last_state.current_pid, last_state.target_active,
+            )
+        return False
 
     def _click_foreground(
         self, quartz: Any, x: float, y: float, press_seconds: float,
     ) -> bool:
         """准确激活目标后单击一次，用户介入时不覆盖其焦点或鼠标位置。"""
         appkit = _foreground_api()
-        workspace = appkit.NSWorkspace.sharedWorkspace()
-        previous_app = workspace.frontmostApplication()
+        previous = self._foreground_snapshot(appkit, self._window.pid)
         previous_cursor = self._cursor_position(quartz)
-        target = appkit.NSRunningApplication.runningApplicationWithProcessIdentifier_(self._window.pid)
-        if target is None or (
-            int(target.processIdentifier()) != self._window.pid
-            or target.bundleIdentifier() != self._window.bundle_id
-        ):
+        if previous.target_bundle_id != self._window.bundle_id:
             raise MacBootstrapError('无法找到绑定的游戏进程，未执行前台启动点击')
         point: tuple[float, float] | None = None
         warped = False
         try:
-            if not target.isActive():
-                previous_pid = int(previous_app.processIdentifier()) if previous_app is not None else None
-                if not self._activate_application(appkit, workspace, target, previous_pid):
+            if not previous.target_active or previous.current_pid != self._window.pid:
+                if not self._activate_application(
+                    appkit, self._window.pid, self._window.bundle_id, previous.current_pid,
+                ):
                     raise MacBootstrapError('游戏进程未成为前台应用，未执行启动点击')
-            if not self._is_game_foreground(workspace, target):
+            if not self._is_game_foreground(appkit):
                 raise MacBootstrapError('游戏进程未成为前台应用，未执行启动点击')
 
             # 激活可能改变窗口位置，必须在激活后重新枚举并换算。
             point = self.resolve_point(x, y)
             events = self._create_mouse_events(quartz, point)
-            if not self._is_game_foreground(workspace, target):
+            if not self._is_game_foreground(appkit):
                 raise MacBootstrapError('前台应用已改变，未执行启动点击')
             warped = True
             self._warp_cursor(quartz, point)
             time.sleep(0.05)
-            if not self._is_game_foreground(workspace, target):
+            if not self._is_game_foreground(appkit):
                 raise MacBootstrapError('前台应用已改变，未执行启动点击')
             if math.dist(self._cursor_position(quartz), point) > 2:
                 raise MacBootstrapError('用户已移动鼠标，未执行启动点击')
@@ -428,12 +483,12 @@ class MacBootstrapPointer:
                     self._warp_cursor(quartz, previous_cursor)
             finally:
                 if (
-                    previous_app is not None
-                    and int(previous_app.processIdentifier()) != self._window.pid
-                    and self._is_game_foreground(workspace, target)
+                    previous.current_pid is not None
+                    and previous.current_pid != self._window.pid
+                    and self._is_game_foreground(appkit)
                 ):
                     restored = self._activate_application(
-                        appkit, workspace, previous_app, self._window.pid,
+                        appkit, previous.current_pid, previous.current_bundle_id, self._window.pid,
                     )
-                    if not restored and self._is_game_foreground(workspace, target):
+                    if not restored and self._is_game_foreground(appkit):
                         raise MacBootstrapError('启动点击结束，但无法恢复此前活动的应用')

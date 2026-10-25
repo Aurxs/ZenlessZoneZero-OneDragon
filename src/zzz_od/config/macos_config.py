@@ -31,6 +31,26 @@ class MacOsConfig(YamlConfig):
         self.update('bundle_id', value)
 
     @property
+    def app_path(self) -> str:
+        """返回可选的已安装应用路径；留空使用 PlayCover 默认应用目录。"""
+        return self.get('app_path', '')
+
+    @app_path.setter
+    def app_path(self, value: str) -> None:
+        """保存完整 .app 路径，启动时核对应用标识。"""
+        self.update('app_path', value)
+
+    @property
+    def launch_timeout_seconds(self) -> int:
+        """返回等候游戏窗口的最大秒数，不代表已进入大世界。"""
+        return self.get('launch_timeout_seconds', 45)
+
+    @launch_timeout_seconds.setter
+    def launch_timeout_seconds(self, value: int) -> None:
+        """保存有界的冷启动窗口等待时间。"""
+        self.update('launch_timeout_seconds', value)
+
+    @property
     def window_title(self) -> str:
         """返回可选的完整窗口标题；空值选择面积唯一最大的正常尺寸窗口。"""
         return self.get('window_title', '')
