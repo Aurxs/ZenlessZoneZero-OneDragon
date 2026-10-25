@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import threading
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -204,8 +205,9 @@ class AutoBattleDodgeContext:
         self._last_check_dodge_time = 0
         self._last_check_audio_time = 0
 
-        # 异步加载音频模板
-        _dodge_check_executor.submit(self.init_audio_template)
+        # 当前声音采集使用 Windows 回放设备，其他平台只识别图像闪光。
+        if sys.platform == 'win32':
+            _dodge_check_executor.submit(self.init_audio_template)
 
     def init_audio_template(self) -> None:
         """
@@ -269,6 +271,8 @@ class AutoBattleDodgeContext:
         :param screenshot_time: 截图时间
         :return: 是否识别到音频提示
         """
+        if sys.platform != 'win32':
+            return False
         if not self._check_audio_lock.acquire(blocking=False):
             return False
 
@@ -335,9 +339,10 @@ class AutoBattleDodgeContext:
 
     def start_context_async(self) -> None:
         """
-        启动上下文，启动音频录制。
+        仅 Windows 启动声音录制，其他平台保留图像闪光识别。
         """
-        self._audio_recorder.start_running_async()
+        if sys.platform == 'win32':
+            self._audio_recorder.start_running_async()
 
     def stop_context(self) -> None:
         """

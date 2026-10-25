@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import inspect
 import logging
+import sys
 import threading
 from enum import Enum
 from functools import cached_property
 from pathlib import Path
-
-from pynput import keyboard
+from typing import TYPE_CHECKING
 
 from one_dragon.base.config.basic_model_config import BasicModelConfig
 from one_dragon.base.config.custom_config import UILanguageEnum
 from one_dragon.base.controller.controller_base import ControllerBase
-from one_dragon.base.controller.pc_button.pc_button_listener import PcButtonListener
 from one_dragon.base.debug.debug_trace_bus import DebugTraceBus
 from one_dragon.base.matcher.ocr.ocr_matcher import OcrMatcher
 from one_dragon.base.matcher.ocr.ocr_service import OcrService
@@ -42,6 +43,11 @@ from one_dragon.base.screen.template_loader import TemplateLoader
 from one_dragon.utils import debug_utils, file_utils, i18_utils, log_utils, thread_utils
 from one_dragon.utils.log_utils import log
 
+if TYPE_CHECKING:
+    from pynput import keyboard
+
+    from one_dragon.base.controller.pc_button.pc_button_listener import PcButtonListener
+
 
 class ContextKeyboardEventEnum(Enum):
 
@@ -55,7 +61,7 @@ class ContextInstanceEventEnum(Enum):
 
 class OneDragonContext(ContextEventBus, OneDragonEnvContext):
 
-    def __init__(self):
+    def __init__(self) -> None:
         ContextEventBus.__init__(self)
         OneDragonEnvContext.__init__(self)
 
@@ -83,8 +89,17 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
         self.ocr_service: OcrService = OcrService(ocr_matcher=self.ocr)
         self.controller: ControllerBase | None = None
 
-        self.keyboard_controller = keyboard.Controller()
-        self.btn_listener = PcButtonListener(on_button_tap=self._on_key_press, listen_keyboard=True, listen_mouse=True)
+        self.keyboard_controller: keyboard.Controller | None = None
+        self.btn_listener: PcButtonListener | None = None
+        if sys.platform == 'win32':
+            from pynput import keyboard
+
+            from one_dragon.base.controller.pc_button.pc_button_listener import (
+                PcButtonListener,
+            )
+
+            self.keyboard_controller = keyboard.Controller()
+            self.btn_listener = PcButtonListener(on_button_tap=self._on_key_press, listen_keyboard=True, listen_mouse=True)
         self._btn_listener_started: bool = False
         self._btn_listener_closed: bool = False
 
@@ -98,6 +113,7 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
         self._init_lock = threading.Lock()
         self._application_registered: bool = False  # 应用是否注册完毕
         self.ready_for_application: bool = False  # 初始化完成 可以运行应用了
+        self.initialization_error: str | None = None
 
     #------------------- 需要懒加载的都使用 @cached_property -------------------#
 
@@ -285,6 +301,7 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
 
         try:
             self.ready_for_application = False
+            self.initialization_error = None
 
             if self.custom_config.ui_language == UILanguageEnum.AUTO.value.value:
                 i18_utils.detect_and_set_default_language()
@@ -324,7 +341,9 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
             self.init_others()
 
             self._start_btn_listener()
-        except Exception:
+        except Exception as error:
+            self.ready_for_application = False
+            self.initialization_error = str(error)
             log.error('初始化出错', exc_info=True)
         finally:
             self._init_lock.release()
@@ -404,7 +423,7 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
         """
         if self.controller is None or not self.controller.is_game_window_ready:
             return
-        if self.controller.game_win is not None:
+        if sys.platform == 'win32' and self.controller.game_win is not None:
             self.controller.game_win.active()
         _, img = self.controller.screenshot(independent=True)
         base_file_name = debug_utils.save_debug_image(img, copy_screenshot=copy_screenshot)
@@ -599,7 +618,7 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
         启动按键监听器 可以重复调用
         已经启动或关闭流程开始后 不会再启动
         """
-        if self._btn_listener_started or self._btn_listener_closed:
+        if self.btn_listener is None or self._btn_listener_started or self._btn_listener_closed:
             return
 
         self.btn_listener.start()
@@ -613,7 +632,8 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
             return
 
         self._btn_listener_closed = True
-        self.btn_listener.stop()
+        if self.btn_listener is not None:
+            self.btn_listener.stop()
 
     def after_app_shutdown(self) -> None:
         """

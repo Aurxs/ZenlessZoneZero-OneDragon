@@ -13,17 +13,19 @@ game 切片方法（``check_window``/``capture``/``analyze``）从
 """
 
 import asyncio
+import sys
 import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
+from math import isfinite
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from one_dragon.base.config.basic_game_config import TypeInputWay
-from one_dragon.base.controller.pc_clipboard import PcClipboard
+from one_dragon.base.controller.gamepad_input import normalize_gamepad_key
 from one_dragon.base.geometry.point import Point
 from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.application import application_const
@@ -441,7 +443,8 @@ class ZzzBackendContext:
         """检查游戏窗口状态。
 
         读取控制器上当前的游戏窗口信息，封装为传输无关的 ``WindowStatus`` 返回。
-        窗口矩形不可用时，坐标/尺寸字段为 None。
+        窗口矩形不可用时，坐标/尺寸字段为 None。Mac 只读已绑定的采集窗口，
+        不检测前台或 Windows 缩放状态，对应布尔字段返回 False；位置未知返回 None。
 
         Returns:
             游戏窗口状态（标题、有效性、激活态、缩放、客户区矩形）。
@@ -451,6 +454,18 @@ class ZzzBackendContext:
         """
         self._ensure_ready()
         controller = self._ctx.controller
+        if sys.platform == 'darwin':
+            if controller is None or controller.window_capture.window is None:
+                raise BackendNotReadyError('控制器或游戏窗口未初始化')
+            window = controller.window_capture.window
+            return WindowStatus(
+                win_title=window.title,
+                is_win_valid=controller.is_game_window_ready,
+                is_win_active=False,
+                is_win_scale=False,
+                width=window.width,
+                height=window.height,
+            )
         if controller is None or controller.game_win is None:
             raise BackendNotReadyError('控制器或游戏窗口未初始化')
         game_win = controller.game_win
@@ -718,10 +733,11 @@ class ZzzBackendContext:
         return {'success': clicked, 'x': int(x), 'y': int(y), 'in_window': clicked, 'pc_alt': pc_alt}
 
     def key_tap(self, key: str, press_time: float = 0.0) -> dict:
-        """键盘按键:``press_time=0`` 短按(tap),``press_time>0`` 长按(press→保持→release)。操作类。
+        """发送按键:``press_time=0`` 短按,``press_time>0`` 按住后释放。操作类。
 
         覆盖框架 ``btn_controller`` 能发的键:移动 ``w``/``a``/``s``/``d``、交互 ``f``、
-        ``esc``、``space`` 等。键名沿用框架约定。需游戏窗口就绪。
+        ``esc``、``space`` 等。Mac 只接受手柄键名(如 ``xbox_a``)，不激活窗口。
+        需游戏窗口就绪。
 
         Args:
             key: 按键名(如 ``'w'``/``'f'``/``'esc'``/``'space'``)。
@@ -734,9 +750,18 @@ class ZzzBackendContext:
             BackendNotReadyError: ZContext / 游戏窗口未就绪时抛。
         """
         self._ensure_ready()
+        if not isfinite(press_time) or press_time < 0:
+            raise ValueError('按住时长必须是有限的非负秒数')
         controller = self._ctx.controller
         if controller is None or not controller.is_game_window_ready:
             raise BackendNotReadyError('游戏窗口未就绪')
+        if sys.platform == 'darwin':
+            normalize_gamepad_key(key)
+            if press_time > 0:
+                controller.btn_press(key, press_time=press_time)
+            else:
+                controller.btn_tap(key)
+            return {'success': True, 'key': key, 'press_time': press_time}
         controller.active_window()
         if press_time > 0:
             controller.btn_controller.press(key, press_time=press_time)
@@ -774,6 +799,7 @@ class ZzzBackendContext:
 
         use_clipboard=None → 跟随 ``game_config.type_input_way``(同 ``EnterGame``);
         True/False → 强制剪贴板/逐键。输入前激活游戏窗口(键盘注入 / Ctrl+V 均需前台焦点)。
+        仅支持 Windows；Mac 明确拒绝，不激活窗口或访问剪贴板。
 
         Args:
             text: 要输入的文本。
@@ -788,12 +814,16 @@ class ZzzBackendContext:
             BackendNotReadyError: ZContext 未就绪或游戏窗口未就绪时抛。
         """
         self._ensure_ready()
+        if sys.platform != 'win32':
+            raise NotImplementedError('当前平台暂不支持文本输入，请在游戏内手动输入')
         controller = self._ctx.controller
         if controller is None or not controller.is_game_window_ready:
             raise BackendNotReadyError('游戏窗口未就绪')
         use_cb = self._resolve_use_clipboard(use_clipboard)
         controller.active_window()
         if use_cb:
+            from one_dragon.base.controller.pc_clipboard import PcClipboard
+
             PcClipboard.copy_and_paste(text)
             method = 'clipboard'
         else:

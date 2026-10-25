@@ -144,6 +144,7 @@ def create_mcp_server(backend: ZzzBackendContext, name: str = "zzz_od") -> MCPSe
         """检查绝区零游戏窗口状态(只读,不改状态)。观察类。
 
         返回窗口标题、有效性、激活态、缩放比例及客户区矩形(与 HTTP ``/game/window`` 同构)。
+        Mac 只读已绑定的采集窗口，位置未知为 None；未检测的激活态和 Windows 缩放状态为 False。
 
         Returns:
             ``WindowStatus``(win_title / is_win_valid / is_win_active / is_win_scale /
@@ -318,13 +319,15 @@ def create_mcp_server(backend: ZzzBackendContext, name: str = "zzz_od") -> MCPSe
         key: Annotated[str, Field(description="框架键名:w/a/s/d 移动、f 交互、esc、space 等(沿用框架 btn_controller 约定)")],
         press_time: Annotated[float, Field(description="按住时长(秒);0=短按 tap,>0=长按(如移动长按 1-2s)")] = 0.0,
     ) -> dict:
-        """键盘按键(press_time=0 短按,>0 长按)。操作类。
+        """发送按键(press_time=0 短按,>0 长按)。操作类。
 
         键盘按键用本 tool;鼠标点击用 ``click_game``;拖拽用 ``drag``。
 
         覆盖框架 btn_controller 能发的键:移动 ``w``/``a``/``s``/``d``、交互 ``f``、
         ``esc``、``space`` 等(键名沿用框架约定)。press_time>0 长按(如移动长按 1-2s)。
         需游戏窗口就绪。
+        Mac 只支持手柄键名，如 ``xbox_a``、``xbox_b``、``xbox_ls_up``，不会激活窗口。
+        press_time 必须是有限的非负秒数。
 
         ⚠️ 操作后建议 sleep(底层无内置等待):移动 wasd ~1s 等角色到位(不等就 interact
         可能失效,见 scratch_card issue #2405)、交互 ``f`` ~1-2s 进场景/对话、``esc``
@@ -368,6 +371,7 @@ def create_mcp_server(backend: ZzzBackendContext, name: str = "zzz_od") -> MCPSe
         """向当前焦点输入框输入文本(账号/密码等)。操作类。
 
         需先用 click_game 点击输入框聚焦。需游戏窗口就绪。
+        仅支持 Windows；Mac 返回未支持，不激活窗口或使用剪贴板。
 
         Returns:
             ``{success, method, masked_text, error?}``;backend 抛错时 success=False + error。

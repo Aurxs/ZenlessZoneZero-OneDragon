@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -94,13 +95,14 @@ class ResourceUpdateCoordinator(QObject):
         self._check_interval: float = 300
         self._checks_started: bool = False
 
-        self._register_check(
-            _ResourceCheck(
-                check_id='launcher',
-                check_update=self.ctx.update_service.is_launcher_update_available,
-                build_specs=self._build_launcher_specs,
+        if sys.platform != 'darwin':
+            self._register_check(
+                _ResourceCheck(
+                    check_id='launcher',
+                    check_update=self.ctx.update_service.is_launcher_update_available,
+                    build_specs=self._build_launcher_specs,
+                )
             )
-        )
         self._register_check(
             _ResourceCheck(
                 check_id='project_models',

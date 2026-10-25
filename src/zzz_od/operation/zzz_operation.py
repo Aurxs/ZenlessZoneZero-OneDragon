@@ -1,9 +1,15 @@
-from collections.abc import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.operation import Operation
-from one_dragon.base.operation.operation_base import OperationResult
-from zzz_od.context.zzz_context import ZContext
-from zzz_od.operation.enter_game.open_and_enter_game import OpenAndEnterGame
+from zzz_od.operation.enter_game.game_session_entry import create_game_session_entry
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from one_dragon.base.operation.operation_base import OperationResult
+    from zzz_od.context.zzz_context import ZContext
 
 
 class ZOperation(Operation):
@@ -14,9 +20,10 @@ class ZOperation(Operation):
                  timeout_seconds: float = -1,
                  op_callback: Callable[[OperationResult], None] | None = None,
                  need_check_game_win: bool = True
-                 ):
+                 ) -> None:
+        """复用对应平台的游戏会话入口。"""
         self.ctx: ZContext = ctx
-        op_to_enter_game = OpenAndEnterGame(ctx)
+        op_to_enter_game = create_game_session_entry(ctx)
         Operation.__init__(self,
                            ctx=ctx,
                            node_max_retry_times=node_max_retry_times,

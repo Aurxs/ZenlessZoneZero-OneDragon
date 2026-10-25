@@ -1,18 +1,18 @@
-from PySide6.QtCore import QObject
-from PySide6.QtCore import Qt
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QIcon
-from PySide6.QtGui import Qt
-from qfluentwidgets import PushButton
-from qfluentwidgets import SettingCard, FluentIconBase
-from typing import Union, Optional
+import sys
+from typing import TYPE_CHECKING
 
-from one_dragon.base.controller.pc_button.pc_button_listener import PcButtonListener
+from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QWidget
+from qfluentwidgets import FluentIconBase, PushButton, SettingCard
+
 from one_dragon.utils.i18_utils import gt
-from one_dragon_qt.utils.layout_utils import Margins, IconSize
+from one_dragon_qt.utils.layout_utils import IconSize, Margins
 from one_dragon_qt.widgets.adapter_init_mixin import AdapterInitMixin
 from one_dragon_qt.widgets.setting_card.setting_card_base import SettingCardBase
-from one_dragon_qt.widgets.setting_card.yaml_config_adapter import YamlConfigAdapter
+
+if TYPE_CHECKING:
+    from one_dragon.base.controller.pc_button.pc_button_listener import PcButtonListener
 
 
 class KeyEventWorker(QObject):
@@ -33,10 +33,10 @@ class KeySettingCard(SettingCardBase, AdapterInitMixin):
     value_changed = Signal(str)
 
     def __init__(self,
-                 icon: Union[str, QIcon, FluentIconBase], title: str, content: Optional[str]=None,
+                 icon: str | QIcon | FluentIconBase, title: str, content: str | None = None,
                  icon_size: IconSize = IconSize(16, 16),
                  margins: Margins = Margins(16, 16, 0, 16),
-                 parent=None):
+                 parent: QWidget | None = None) -> None:
 
         SettingCardBase.__init__(
             self,
@@ -51,13 +51,16 @@ class KeySettingCard(SettingCardBase, AdapterInitMixin):
 
         # 初始化 PushButton
         self.value: str = ''
-        self.btn = PushButton(text='', parent=self)
+        self.btn: PushButton = PushButton(text='', parent=self)
         self.btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn.clicked.connect(self._on_btn_clicked)
+        if sys.platform != 'win32':
+            self.btn.setEnabled(False)
+            self.btn.setToolTip(gt('当前平台暂不支持键盘录制'))
 
         # 初始化监听器和键盘事件工作者
-        self.button_listener = None  # 按键监听
-        self.key_worker = KeyEventWorker()
+        self.button_listener: PcButtonListener | None = None  # 按键监听
+        self.key_worker: KeyEventWorker = KeyEventWorker()
         self.key_worker.key_pressed.connect(self._on_key_signal)
 
         # 布局处理
@@ -69,7 +72,14 @@ class KeySettingCard(SettingCardBase, AdapterInitMixin):
         点击按钮后 开始监听按键事件
         :return:
         """
+        if sys.platform != 'win32':
+            return
+
         if self.button_listener is None:
+            from one_dragon.base.controller.pc_button.pc_button_listener import (
+                PcButtonListener,
+            )
+
             self.button_listener = PcButtonListener(
                 self._on_key_press, listen_keyboard=True, listen_mouse=True
             )
@@ -79,7 +89,7 @@ class KeySettingCard(SettingCardBase, AdapterInitMixin):
             self._stop_listener()
             self.btn.setText(self.value.upper())
 
-    def _on_key_press(self, key):
+    def _on_key_press(self, key: str) -> None:
         """
         按键时触发
         :param key:

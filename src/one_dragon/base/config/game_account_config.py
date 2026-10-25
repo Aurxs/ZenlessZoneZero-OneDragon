@@ -7,6 +7,7 @@ from one_dragon.base.config.yaml_config import YamlConfig
 class GamePlatformEnum(Enum):
 
     PC = ConfigItem('PC')
+    MACOS_PLAYCOVER = ConfigItem('macOS PlayCover', 'macos_playcover')
 
 
 class GameLanguageEnum(Enum):

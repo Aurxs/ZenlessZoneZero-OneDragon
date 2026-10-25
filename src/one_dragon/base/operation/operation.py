@@ -388,7 +388,12 @@ class Operation(OperationBase):
         if self.ctx.is_game_window_ready:
             return self.round_success()
         else:
-            return self.round_fail(f'未打开游戏窗口 {self.ctx.controller.game_win.win_title}')
+            controller = self.ctx.controller
+            description = getattr(controller, 'game_window_description', '')
+            if not description:
+                game_window = getattr(controller, 'game_win', None)
+                description = getattr(game_window, 'win_title', '未配置')
+            return self.round_fail(f'未打开游戏窗口 {description}')
 
     def open_and_enter_game(self) -> OperationRoundResult:
         """打开并进入游戏。

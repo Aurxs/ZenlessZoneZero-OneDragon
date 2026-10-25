@@ -1,0 +1,89 @@
+screen_id: macos_bootstrap
+screen:
+  screen_id: macos_bootstrap
+  screen_name: Mac启动
+  pc_alt: false
+  area_list:
+  - area_name: 大世界-手柄提示
+    area_type: none
+    pc_rect:
+    - 1795
+    - 98
+    - 1855
+    - 155
+  - area_name: 大世界-菜单
+    area_type: template
+    pc_rect:
+    - 121
+    - 60
+    - 206
+    - 123
+    template_sub_dir: ios_gamepad
+    template_id: bootstrap_touch_menu
+    template_match_threshold: 0.9
+  - area_name: 输入-UI布局
+    area_type: none
+    pc_rect:
+    - 410
+    - 200
+    - 690
+    - 325
+  - area_name: 输入-当前布局
+    area_type: none
+    pc_rect:
+    - 1290
+    - 195
+    - 1810
+    - 322
+  - area_name: 输入-布局选项
+    area_type: none
+    pc_rect:
+    - 1400
+    - 335
+    - 1810
+    - 505
+  - area_name: 设置-侧栏
+    area_type: none
+    pc_rect:
+    - 70
+    - 180
+    - 440
+    - 780
+  - area_name: 设置-输入
+    area_type: none
+    pc_rect:
+    - 170
+    - 250
+    - 315
+    - 370
+  - area_name: 手柄-返回提示
+    area_type: none
+    pc_rect:
+    - 1415
+    - 1000
+    - 1470
+    - 1050
+  - area_name: 菜单-底部
+    area_type: none
+    pc_rect:
+    - 80
+    - 1000
+    - 1810
+    - 1055
+  - area_name: 菜单-设置
+    area_type: none
+    pc_rect:
+    - 550
+    - 900
+    - 650
+    - 1000
+  - area_name: 大世界-触屏操作
+    area_type: template
+    pc_rect:
+    - 75
+    - 884
+    - 195
+    - 1004
+    template_sub_dir: ios_gamepad
+    template_id: bootstrap_touch_camera
+    template_match_threshold: 0.9

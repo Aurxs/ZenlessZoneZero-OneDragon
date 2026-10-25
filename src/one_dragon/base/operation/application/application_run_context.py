@@ -410,7 +410,19 @@ class ApplicationRunContext:
         result = self._create_run_result(RunFinishReason.STOPPED)
         return self._finish_running(result)
 
-    def switch_context_pause_and_run(self):
+    def _call_input_lifecycle(self, method_name: str) -> bool:
+        """调用兼容层的输入生命周期，不要求既有控制器实现新接口。"""
+        callback = getattr(self.ctx.controller, method_name, None)
+        if callback is None:
+            return True
+        try:
+            callback()
+            return True
+        except Exception:
+            log.error('控制器输入生命周期调用失败: %s', method_name, exc_info=True)
+            return False
+
+    def switch_context_pause_and_run(self) -> None:
         """
         切换暂停和运行状态。
 
@@ -419,10 +431,13 @@ class ApplicationRunContext:
         if self._run_state == ApplicationRunContextStateEnum.RUNNING:
             log.info("暂停运行")
             self._run_state = ApplicationRunContextStateEnum.PAUSE
+            self._call_input_lifecycle('pause_input')
             self.event_bus.dispatch_event(
                 ApplicationRunContextStateEventEnum.PAUSE, self._run_state
             )
         elif self._run_state == ApplicationRunContextStateEnum.PAUSE:
+            if not self._call_input_lifecycle('resume_input'):
+                return
             log.info("恢复运行")
             self._run_state = ApplicationRunContextStateEnum.RUNNING
             self.event_bus.dispatch_event(
@@ -463,6 +478,11 @@ class ApplicationRunContext:
         """
         start_time = time.time()
         while not self.ctx.ready_for_application:
+            if getattr(self.ctx, 'initialization_error', None):
+                log.error('无法启动应用：%s', self.ctx.initialization_error)
+                return self._create_run_result(
+                    RunFinishReason.NOT_STARTED, app_id, instance_idx, group_id
+                )
             now = time.time()
             if now - start_time >= init_timeout:
                 log.error("等待应用 %s 初始化超时", app_id)

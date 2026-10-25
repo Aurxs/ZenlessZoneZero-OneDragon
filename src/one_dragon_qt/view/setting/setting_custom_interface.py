@@ -1,8 +1,10 @@
-import ctypes
-import os
-import shutil
-from ctypes import wintypes
+from __future__ import annotations
 
+import shutil
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from PySide6.QtCore import QStandardPaths
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QFileDialog, QWidget
 from qfluentwidgets import (
@@ -20,7 +22,6 @@ from one_dragon.base.config.custom_config import (
     ThemeEnum,
     UILanguageEnum,
 )
-from one_dragon.base.operation.one_dragon_context import OneDragonContext
 from one_dragon.utils import app_utils, os_utils
 from one_dragon.utils.i18_utils import gt
 from one_dragon_qt.services.theme_manager import ThemeManager
@@ -34,10 +35,13 @@ from one_dragon_qt.widgets.setting_card.password_switch_setting_card import (
 )
 from one_dragon_qt.widgets.vertical_scroll_interface import VerticalScrollInterface
 
+if TYPE_CHECKING:
+    from one_dragon.base.operation.one_dragon_context import OneDragonContext
+
 
 class SettingCustomInterface(VerticalScrollInterface):
 
-    def __init__(self, ctx: OneDragonContext, parent=None):
+    def __init__(self, ctx: OneDragonContext, parent: QWidget | None = None) -> None:
         self.ctx: OneDragonContext = ctx
 
         VerticalScrollInterface.__init__(
@@ -162,16 +166,15 @@ class SettingCustomInterface(VerticalScrollInterface):
         ThemeManager.set_theme_color(_ct)
 
     def _on_banner_select_clicked(self) -> None:
-        _dp = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
-        ctypes.windll.shell32.SHGetFolderPathW(None, 0x0027, None, 0, _dp)
+        _dp = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation)
         _fp, _ = QFileDialog.getOpenFileName(
             self,
             f"{gt('选择你的')}{gt('背景图片')}",
-            _dp.value,
+            _dp,
             filter="Images and Videos (*.png *.jpg *.jpeg *.webp *.bmp *.webm *.mp4 *.avi *.mov *.mkv);;Images (*.png *.jpg *.jpeg *.webp *.bmp);;Videos (*.webm *.mp4 *.avi *.mov *.mkv)"
         )
         if _fp is not None and _fp != '':
-            _bp = os.path.join(os_utils.get_path_under_work_dir('custom', 'assets', 'ui'), 'banner')
+            _bp = Path(os_utils.get_path_under_work_dir('custom', 'assets', 'ui')) / 'banner'
             shutil.copyfile(_fp, _bp)
             self.reload_banner()
 

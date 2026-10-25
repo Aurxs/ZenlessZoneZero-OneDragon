@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import sys
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import Qt
 from PySide6.QtWidgets import QWidget
@@ -11,7 +16,6 @@ from qfluentwidgets import (
     VBoxLayout,
 )
 
-from one_dragon.base.operation.one_dragon_context import OneDragonContext
 from one_dragon.envs.env_config import ProxyTypeEnum, ScreenshotMethodEnum
 from one_dragon.utils.i18_utils import gt
 from one_dragon_qt.widgets.setting_card.combo_box_setting_card import (
@@ -23,10 +27,13 @@ from one_dragon_qt.widgets.setting_card.switch_setting_card import SwitchSetting
 from one_dragon_qt.widgets.setting_card.text_setting_card import TextSettingCard
 from one_dragon_qt.widgets.vertical_scroll_interface import VerticalScrollInterface
 
+if TYPE_CHECKING:
+    from one_dragon.base.operation.one_dragon_context import OneDragonContext
+
 
 class SettingEnvInterface(VerticalScrollInterface):
 
-    def __init__(self, ctx: OneDragonContext, parent=None):
+    def __init__(self, ctx: OneDragonContext, parent: QWidget | None = None) -> None:
         self.ctx: OneDragonContext = ctx
 
         VerticalScrollInterface.__init__(
@@ -44,25 +51,31 @@ class SettingEnvInterface(VerticalScrollInterface):
 
         self.help_opt = HelpCard(
             title='设置说明',
-            content='不清楚用途时建议保持默认，下载失败或无法截图时再按说明调整',
+            content=(
+                'Mac 使用窗口采集；开始、暂停和停止请使用界面按钮'
+                if sys.platform == 'darwin'
+                else '不清楚用途时建议保持默认，下载失败或无法截图时再按说明调整'
+            ),
         )
         content_layout.addWidget(self.help_opt)
         content_layout.addWidget(self._init_basic_group())
         content_layout.addWidget(self._init_python_group())
         content_layout.addWidget(self._init_web_group())
-        content_layout.addWidget(self._init_key_group())
+        if sys.platform == 'win32':
+            content_layout.addWidget(self._init_key_group())
 
         return content_widget
 
     def _init_basic_group(self) -> SettingCardGroup:
         basic_group = SettingCardGroup(gt('基础'))
 
-        self.screenshot_method_opt = ComboBoxSettingCard(
-            icon=FluentIcon.CAMERA, title='截图方法',
-            options_enum=ScreenshotMethodEnum
-        )
-        self.screenshot_method_opt.value_changed.connect(lambda: self.ctx.init_controller())
-        basic_group.addSettingCard(self.screenshot_method_opt)
+        if sys.platform == 'win32':
+            self.screenshot_method_opt: ComboBoxSettingCard = ComboBoxSettingCard(
+                icon=FluentIcon.CAMERA, title='截图方法',
+                options_enum=ScreenshotMethodEnum
+            )
+            self.screenshot_method_opt.value_changed.connect(lambda: self.ctx.init_controller())
+            basic_group.addSettingCard(self.screenshot_method_opt)
 
         self.debug_opt = SwitchSettingCard(
             icon=FluentIcon.SEARCH, title='调试模式', content='正常无需开启'
@@ -78,11 +91,12 @@ class SettingEnvInterface(VerticalScrollInterface):
         self.developer_mode_opt.value_changed.connect(self._on_developer_mode_changed)
         basic_group.addSettingCard(self.developer_mode_opt)
 
-        self.copy_screenshot_opt = SwitchSettingCard(
-            icon=FluentIcon.CAMERA, title='复制截图到剪贴板',
-            content='按下截图按键时，自动将截图复制到剪贴板'
-        )
-        basic_group.addSettingCard(self.copy_screenshot_opt)
+        if sys.platform == 'win32':
+            self.copy_screenshot_opt: SwitchSettingCard = SwitchSettingCard(
+                icon=FluentIcon.CAMERA, title='复制截图到剪贴板',
+                content='按下截图按键时，自动将截图复制到剪贴板'
+            )
+            basic_group.addSettingCard(self.copy_screenshot_opt)
 
         return basic_group
 
@@ -172,18 +186,18 @@ class SettingEnvInterface(VerticalScrollInterface):
         """
         VerticalScrollInterface.on_interface_shown(self)
 
-        self.screenshot_method_opt.init_with_adapter(self.ctx.env_config.get_prop_adapter('screenshot_method'))
         self.debug_opt.init_with_adapter(self.ctx.env_config.get_prop_adapter('is_debug'))
         self.developer_mode_opt.init_with_adapter(
             self.ctx.env_config.get_prop_adapter('developer_mode')
         )
         self.debug_opt.setVisible(self.ctx.env_config.developer_mode)
-        self.copy_screenshot_opt.init_with_adapter(self.ctx.env_config.get_prop_adapter('copy_screenshot'))
-
-        self.key_start_running_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_start_running'))
-        self.key_stop_running_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_stop_running'))
-        self.key_screenshot_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_screenshot'))
-        self.key_debug_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_debug'))
+        if sys.platform == 'win32':
+            self.screenshot_method_opt.init_with_adapter(self.ctx.env_config.get_prop_adapter('screenshot_method'))
+            self.copy_screenshot_opt.init_with_adapter(self.ctx.env_config.get_prop_adapter('copy_screenshot'))
+            self.key_start_running_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_start_running'))
+            self.key_stop_running_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_stop_running'))
+            self.key_screenshot_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_screenshot'))
+            self.key_debug_input.init_with_adapter(self.ctx.env_config.get_prop_adapter('key_debug'))
 
         self.pip_source_opt.init_with_adapter(self.ctx.env_config.get_prop_adapter('pip_source'))
 

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 try:
     import sys
+    from typing import TYPE_CHECKING
 
     from PySide6.QtCore import Qt, QThread, QTimer, Signal
     from PySide6.QtGui import QCloseEvent
@@ -10,15 +13,18 @@ try:
         setTheme,
     )
 
+    from one_dragon.base.operation.context_notify_event import ContextNotifyEvent
     from one_dragon.base.operation.one_dragon_context import ContextInstanceEventEnum
     from one_dragon.utils import app_utils, os_utils
     from one_dragon.utils.i18_utils import gt
-    from one_dragon_qt.overlay.overlay_manager import OverlayManager
     from one_dragon_qt.services.styles_manager import OdQtStyleSheet
     from one_dragon_qt.view.context_event_signal import ContextEventSignal
     from one_dragon_qt.windows.main_app_window_base import MainAppWindowBase
     from one_dragon_qt.windows.window import PhosTitleBar
     from zzz_od.context.zzz_context import ZContext
+
+    if TYPE_CHECKING:
+        from one_dragon_qt.overlay.overlay_manager import OverlayManager
 
     _init_error = None
 
@@ -31,9 +37,17 @@ try:
             self.ctx = ctx
             self._window = window
 
-        def run(self):
+        def run(self) -> None:
+            """只有初始化成功才发现设置，失败时向主界面报告原因。"""
             self.ctx.init()
-            self._window.on_ctx_ready()
+            if self.ctx.ready_for_application:
+                self._window.on_ctx_ready()
+            else:
+                event = ContextNotifyEvent.error(
+                    '初始化未完成',
+                    self.ctx.initialization_error or '请查看日志中的初始化错误',
+                )
+                self.ctx.dispatch_event(ContextNotifyEvent.EVENT_ID, event)
             self.finished.emit()
 
 
@@ -91,7 +105,11 @@ try:
             self._launch_timer.timeout.connect(self._after_app_launch)
             self._launch_timer.start(2000)  # 2秒后发送，确保UI完全渲染
 
-            self.overlay_manager = OverlayManager.create(self.ctx, parent=self)
+            self.overlay_manager: OverlayManager | None = None
+            if sys.platform == 'win32':
+                from one_dragon_qt.overlay.overlay_manager import OverlayManager
+
+                self.overlay_manager = OverlayManager.create(self.ctx, parent=self)
             if self.overlay_manager is not None:
                 self.overlay_manager.start()
 
@@ -149,9 +167,11 @@ try:
             self.add_sub_interface(ZStandaloneAppInterface(self.ctx, parent=self))
 
             # 画中画
-            from one_dragon_qt.widgets.pip_button import PipButton
-            self.pip_btn = PipButton(self.ctx, parent=self)
-            self.add_nav_widget(self.pip_btn)
+            if sys.platform == 'win32':
+                from one_dragon_qt.widgets.pip_button import PipButton
+
+                self.pip_btn = PipButton(self.ctx, parent=self)
+                self.add_nav_widget(self.pip_btn)
 
             # 点赞
             from one_dragon_qt.view.like_interface import LikeInterface
@@ -281,7 +301,11 @@ except Exception:
 
 # 初始化应用程序，并启动主窗口
 def main() -> None:
+    """启动公共界面，按宿主平台显示初始化错误。"""
     if _init_error is not None:
+        if sys.platform != 'win32':
+            print(_init_error, file=sys.stderr)
+            sys.exit(1)
         # 显示错误弹窗，询问用户是否打开排障文档
         error_message = f"启动一条龙失败,报错信息如下:\n{stack_trace}\n\n是否打开排障文档查看解决方案?"
         # MB_ICONERROR | MB_OKCANCEL = 0x10 | 0x01 = 0x11

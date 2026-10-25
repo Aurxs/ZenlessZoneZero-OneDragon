@@ -1,3 +1,5 @@
+import sys
+
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
@@ -106,14 +108,16 @@ class AppRunInterface(VerticalScrollInterface):
         content_layout.addWidget(btn_row_widget)
 
         self.start_btn = PrimaryPushButton(
-            text=f"{gt('开始')} {self.ctx.key_start_running.upper()}",
+            text=(gt('开始') if sys.platform == 'darwin'
+                  else f"{gt('开始')} {self.ctx.key_start_running.upper()}"),
             icon=FluentIcon.PLAY,
         )
         self.start_btn.clicked.connect(self._on_start_clicked)
         btn_row_layout.addWidget(self.start_btn)
 
         self.stop_btn = PushButton(
-            text=f"{gt('停止')} {self.ctx.key_stop_running.upper()}",
+            text=(gt('停止') if sys.platform == 'darwin'
+                  else f"{gt('停止')} {self.ctx.key_stop_running.upper()}"),
             icon=FluentIcon.CLOSE
         )
         self.stop_btn.clicked.connect(self._on_stop_clicked)
@@ -142,6 +146,7 @@ class AppRunInterface(VerticalScrollInterface):
     def on_interface_shown(self) -> None:
         VerticalScrollInterface.on_interface_shown(self)
         self.ctx.listen_event(ContextKeyboardEventEnum.PRESS.value, self._on_key_press)
+        self.on_context_state_changed()
 
     def on_interface_hidden(self) -> None:
         VerticalScrollInterface.on_interface_hidden(self)
@@ -162,8 +167,17 @@ class AppRunInterface(VerticalScrollInterface):
         if self.app_runner.isRunning():
             log.error('已有应用在运行中')
             return
+        reason = self._get_application_unavailable_reason()
+        if reason is not None:
+            log.error(reason)
+            return
         self.app_runner.app_id = self.app_id
         self.app_runner.start()
+
+    def _get_application_unavailable_reason(self) -> str | None:
+        """项目可提供运行限制；未声明此能力的项目保留原行为。"""
+        callback = getattr(self.ctx, 'get_application_unavailable_reason', None)
+        return callback(self.app_id) if callable(callback) else None
 
     def on_context_state_changed(self) -> None:
         """
@@ -183,9 +197,17 @@ class AppRunInterface(VerticalScrollInterface):
             icon = FluentIcon.PLAY
             self.log_card.stop()  # 停止日志更新
 
-        self.start_btn.setText(f"{text} {self.ctx.key_start_running.upper()}")
+        self.start_btn.setText(
+            text if sys.platform == 'darwin' else f"{text} {self.ctx.key_start_running.upper()}"
+        )
         self.start_btn.setIcon(icon)
         self.state_text.setText(f"{gt('当前状态')} {self.ctx.run_context.run_status_text}")
+        reason = self._get_application_unavailable_reason()
+        unavailable = self.ctx.run_context.is_context_stop and reason is not None
+        self.start_btn.setEnabled(not unavailable)
+        self.start_btn.setToolTip(reason or '')
+        if unavailable:
+            self.start_btn.setText(reason.split('，', 1)[0])
 
     def _on_start_clicked(self) -> None:
         if self.ctx.run_context.is_context_stop:

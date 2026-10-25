@@ -12,19 +12,31 @@ ANSI_ESCAPE_PATTERN = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 
 def start_one_dragon(restart: bool) -> None:
     """启动独立的一条龙进程，重启时在创建进程成功后退出当前程序。"""
-    if getattr(sys, 'frozen', False):
-        launcher_path = Path(sys.executable)
-    else:
-        launcher_path = Path(os_utils.get_work_dir()) / 'OneDragon-Launcher.exe'
     env = os.environ.copy()
-    # 重启进程必须重新初始化 PyInstaller，不能复用即将退出的父进程环境。
-    env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
-    subprocess.Popen(
-        [str(launcher_path)],
-        cwd=os_utils.get_work_dir(),
-        env=env,
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
-    )
+    if sys.platform == 'darwin':
+        source_dir = str(Path(os_utils.get_work_dir()) / 'src')
+        python_path = env.get('PYTHONPATH', '')
+        env['PYTHONPATH'] = os.pathsep.join(
+            [source_dir, python_path] if python_path else [source_dir]
+        )
+        subprocess.Popen(
+            [sys.executable, '-m', 'zzz_od.macos.main'],
+            cwd=os_utils.get_work_dir(),
+            env=env,
+        )
+    else:
+        if getattr(sys, 'frozen', False):
+            launcher_path = Path(sys.executable)
+        else:
+            launcher_path = Path(os_utils.get_work_dir()) / 'OneDragon-Launcher.exe'
+        # 重启进程必须重新初始化 PyInstaller，不能复用即将退出的父进程环境。
+        env['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+        subprocess.Popen(
+            [str(launcher_path)],
+            cwd=os_utils.get_work_dir(),
+            env=env,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
     if restart:
         sys.exit(0)
 
@@ -67,6 +79,8 @@ def get_launcher_version() -> str:
     Returns:
         str: 版本号
     """
+    if sys.platform == 'darwin':
+        return ''
     if getattr(sys, 'frozen', False):
         launcher_path = Path(sys.executable)
     else:
