@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import re
 from typing import TYPE_CHECKING, ClassVar
-
-import cv2
 
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation import Operation
@@ -13,12 +10,14 @@ from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from zzz_od.application.charge_plan import charge_plan_const
 from zzz_od.application.charge_plan.charge_plan_config import CardNumEnum
-from zzz_od.operation.gamepad.focus import highlight_mask
+from zzz_od.operation.gamepad.configure_cards import (
+    GamepadConfigureCards,
+    read_preset_charge,
+    survey_preset_focused,
+)
 from zzz_od.operation.zzz_operation import ZOperation
 
 if TYPE_CHECKING:
-    from cv2.typing import MatLike
-
     from one_dragon.base.operation.operation_base import OperationResult
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.application.charge_plan.charge_plan_config import (
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
 
 
 class GamepadCombatSimulation(ZOperation):
-    """只运行已验证的调查专项默认五卡，不变更队伍和电量来源。"""
+    """只运行调查专项一张或五张卡片，不变更队伍和电量来源。"""
 
     STATUS_CHARGE_NOT_ENOUGH: ClassVar[str] = '电量不足'
     STATUS_DEPLOYMENT_READY: ClassVar[str] = '出战准备就绪'
@@ -91,28 +90,9 @@ class GamepadCombatSimulation(ZOperation):
             self.last_screenshot, '实战模拟室', area_name
         ).is_success
 
-    def _read_area(self, area_name: str) -> tuple[MatLike, dict] | None:
-        """从平台区域读取局部图与 OCR，区域缺失时不输入。"""
-        area = self.ctx.screen_loader.get_area('实战模拟室', area_name)
-        if area is None or self.last_screenshot is None:
-            return None
-        rect = area.rect
-        image = self.last_screenshot[rect.y1:rect.y2, rect.x1:rect.x2]
-        if not image.size:
-            return None
-        return image, self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, rect)
-
     def read_charge(self) -> tuple[int, int] | None:
         """读取画面实际消耗，不能用默认数量的二十电量预估替代。"""
-        area = self._read_area('手柄-电量')
-        if area is None:
-            return None
-        values: set[tuple[int, int]] = set()
-        for text in area[1]:
-            match = re.fullmatch(r'\s*(\d{1,4})\s*/\s*(\d{1,3})\s*', text)
-            if match is not None:
-                values.add((int(match[1]), int(match[2])))
-        return next(iter(values)) if len(values) == 1 else None
+        return read_preset_charge(self.ctx, self.last_screenshot)
 
     def _charge(self) -> tuple[int, int] | None:
         """兼容已有单次挑战调用，计划调度可直接读取实际电量。"""
@@ -120,26 +100,7 @@ class GamepadCombatSimulation(ZOperation):
 
     def _survey_selected(self) -> bool:
         """调查专项文字须被完整黄色卡片边框包住。"""
-        area = self._read_area('手柄-预设列表')
-        if area is None:
-            return False
-        image, results = area
-        target = next((matches.max for text, matches in results.items()
-                       if '调查专项' in text and matches.max is not None), None)
-        if target is None:
-            return False
-        contours, _ = cv2.findContours(
-            highlight_mask(image, 'yellow'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
-        for contour in contours:
-            x, y, width, height = cv2.boundingRect(contour)
-            if width < 200 or height < 100:
-                continue
-            if cv2.contourArea(contour) / (width * height) < 0.75:
-                continue
-            if x < target.x < target.x + target.w < x + width and y < target.y < target.y + target.h < y + height:
-                return True
-        return False
+        return survey_preset_focused(self.ctx, self.last_screenshot)
 
     def _deployment_visible(self) -> bool:
         """出战与预备编队同时出现才确认编队页。"""
@@ -153,6 +114,16 @@ class GamepadCombatSimulation(ZOperation):
             self.last_screenshot, '战斗画面', area
         ).is_success for area in ('手柄-挑战结果', '手柄-完成'))
 
+    @property
+    def expected_card_count(self) -> int:
+        """默认沿用五张目标，已保存的一张预设不能冒充默认五张。"""
+        return 1 if self.plan.card_num == '1' else 5
+
+    @property
+    def expected_charge(self) -> int:
+        """仅作一致性校验，是否足够仍读取当前画面电量。"""
+        return self.expected_card_count * 20
+
     @operation_node(name='检查手柄计划', is_start_node=True)
     def check_plan(self) -> OperationRoundResult:
         """只接受本次已有画面与输入证据的计划。"""
@@ -162,10 +133,10 @@ class GamepadCombatSimulation(ZOperation):
             or self.plan.mission_type_name != '基础材料'
             or self.plan.mission_name != '调查专项'
             or self.plan.level != '默认等级'
-            or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '5')
+            or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '1', '5')
             or self.plan.predefined_team_idx != -1
         ):
-            return self.round_fail('手柄实战模拟室暂仅支持调查专项默认五卡、默认等级与当前编队')
+            return self.round_fail('手柄实战模拟室暂仅支持调查专项1张或5张卡片、默认等级与当前编队')
         if self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('当前计划已完成')
         return self.round_success()
@@ -183,10 +154,29 @@ class GamepadCombatSimulation(ZOperation):
         return self.round_success()
 
     @node_from(from_name='加载既有自动战斗')
+    @operation_node(name='配置挑战卡片')
+    def prepare_cards(self) -> OperationRoundResult:
+        """先配置卡片再判断电量，不因旧五卡预设误挡一张计划。"""
+        if self._deployment_visible():
+            return self.round_success()
+        return self.round_by_op_result(
+            GamepadConfigureCards(self.ctx, self.expected_card_count).execute()
+        )
+
+    @node_from(from_name='配置挑战卡片')
     @operation_node(name='准备当前编队', node_max_retry_times=10, timeout_seconds=15)
     def prepare_deployment(self) -> OperationRoundResult:
         """核对实际预设后只按一次 Start，后续轮次等待编队画面。"""
         if self._deployment_visible():
+            charge = self._charge()
+            if charge is None:
+                return self.round_retry('未能确认编队页实际电量', wait=1)
+            if charge[1] != self.expected_charge:
+                return self.round_fail(
+                    f'当前编队消耗 {charge[1]} 电量，与目标 {self.expected_charge} 不一致'
+                )
+            if charge[0] < charge[1]:
+                return self.round_fail(self.STATUS_CHARGE_NOT_ENOUGH)
             return self.round_success(
                 self.STATUS_PREPARED if self.prepare_only else self.STATUS_DEPLOYMENT_READY
             )
@@ -198,8 +188,8 @@ class GamepadCombatSimulation(ZOperation):
         if charge is None:
             return self.round_retry('未能确认实际电量消耗', wait=1)
         current, required = charge
-        if required != 100:
-            return self.round_fail(f'当前预设消耗 {required} 电量，尚未验证该卡片数量')
+        if required != self.expected_charge:
+            return self.round_fail(f'当前预设消耗 {required} 电量，与目标 {self.expected_charge} 不一致')
         if current < required:
             return self.round_fail(self.STATUS_CHARGE_NOT_ENOUGH)
         if not self._next_sent:
@@ -219,8 +209,8 @@ class GamepadCombatSimulation(ZOperation):
         if charge is None:
             return self.round_retry('未能确认出战电量', wait=1)
         current, required = charge
-        if required != 100:
-            return self.round_fail(f'出战消耗 {required} 电量，尚未验证该卡片数量')
+        if required != self.expected_charge:
+            return self.round_fail(f'出战消耗 {required} 电量，与目标 {self.expected_charge} 不一致')
         if current < required:
             return self.round_fail(self.STATUS_CHARGE_NOT_ENOUGH)
         self.ctx.controller.btn_tap('start')

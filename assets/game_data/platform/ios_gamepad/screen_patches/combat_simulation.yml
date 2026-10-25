@@ -68,3 +68,24 @@ added_areas:
   - 650
   text: 代理人晋升
   lcs_percent: 0.8
+- area_name: 手柄-卡片编辑信息
+  area_type: none
+  pc_rect:
+  - 1100
+  - 975
+  - 1910
+  - 1080
+- area_name: 手柄-编辑随机卡
+  area_type: none
+  pc_rect:
+  - 510
+  - 110
+  - 800
+  - 550
+- area_name: 手柄-预设操作菜单
+  area_type: none
+  pc_rect:
+  - 425
+  - 680
+  - 725
+  - 975

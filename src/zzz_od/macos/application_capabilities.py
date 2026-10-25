@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 
 
 MACOS_CHARGE_PLAN_LIMITS: str = (
-    'Mac 目前仅支持基础材料调查专项、默认等级、默认或五张卡片、当前编队；'
-    '每场实际消耗100电量，不自动补电量'
+    'Mac 目前仅支持基础材料调查专项、默认等级、默认五卡、一张或五张卡片、当前编队；'
+    '每场核对实际消耗20或100电量，不自动补电量'
 )
 MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     application_const.ONE_DRAGON_APP_ID,

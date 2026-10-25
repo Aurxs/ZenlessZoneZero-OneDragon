@@ -125,8 +125,8 @@ class GamepadTransportByCompendium(ZOperation):
         if not self._opened and self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册'
         ).is_success:
-            self.ctx.controller.click(gamepad_key='compendium')
-            self._opened = True
+            if self.ctx.controller.click(gamepad_key='compendium'):
+                self._opened = True
         return self.round_retry('等待手柄快捷手册', wait=1)
 
     @node_from(from_name='打开快捷手册')

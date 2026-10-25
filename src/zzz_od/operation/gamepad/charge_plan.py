@@ -11,6 +11,7 @@ from zzz_od.application.charge_plan.charge_plan_config import (
     RestoreChargeEnum,
 )
 from zzz_od.operation.gamepad.combat_simulation import GamepadCombatSimulation
+from zzz_od.operation.gamepad.configure_cards import GamepadConfigureCards
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
@@ -40,7 +41,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
         'mission_type_name': ('基础材料',),
         'mission_name': ('调查专项',),
         'level': ('默认等级',),
-        'card_num': (CardNumEnum.DEFAULT.value.value, '5'),
+        'card_num': (CardNumEnum.DEFAULT.value.value, '1', '5'),
         'predefined_team_idx': (-1,),
     }
     labels: dict[str, str] = {
@@ -59,7 +60,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
                     '目前仅支持训练/实战模拟室/基础材料/调查专项、默认等级、'
-                    '默认五卡或5张卡片、当前编队'
+                    '默认五卡、1张或5张卡片、当前编队'
                 )
         if plan.plan_times <= 0 or plan.run_times < 0:
             return f'Mac 体力计划第 {index} 项的计划次数必须大于零，已运行次数不能为负'
@@ -67,7 +68,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
 
 
 class GamepadChargePlan(ZOperation):
-    """每场核对实际一百电量，胜利次数沿用原配置保存。"""
+    """每场配置后核对实际二十或一百电量，胜利次数沿用原配置保存。"""
 
     STATUS_FINISHED: ClassVar[str] = '体力计划结束'
     STATUS_CHARGE_NOT_ENOUGH: ClassVar[str] = GamepadCombatSimulation.STATUS_CHARGE_NOT_ENOUGH
@@ -149,6 +150,16 @@ class GamepadChargePlan(ZOperation):
         return self.round_by_op_result(op.execute())
 
     @node_from(from_name='手柄传送至模拟室')
+    @operation_node(name='配置本次卡片数量', screenshot_before_round=False)
+    def configure_cards(self) -> OperationRoundResult:
+        """先把计划数量落实到预设，不将旧预设消耗用于判断本次是否足够。"""
+        if self._simulation is None:
+            return self.round_fail('尚未创建单次挑战')
+        return self.round_by_op_result(
+            GamepadConfigureCards(self.ctx, self._simulation.expected_card_count).execute()
+        )
+
+    @node_from(from_name='配置本次卡片数量')
     @operation_node(name='核对单次实际电量', node_max_retry_times=5, timeout_seconds=8)
     def check_charge(self) -> OperationRoundResult:
         """只读已确认预设页，不能把默认数量预估二十当作实际消耗。"""
@@ -161,8 +172,10 @@ class GamepadChargePlan(ZOperation):
         if charge is None:
             return self.round_retry('未能确认实际电量消耗', wait=1)
         current, required = charge
-        if required != 100:
-            return self.round_fail(f'当前预设消耗 {required} 电量，Mac 尚未支持该卡片数量')
+        if required != self._simulation.expected_charge:
+            return self.round_fail(
+                f'当前预设消耗 {required} 电量，与目标 {self._simulation.expected_charge} 不一致'
+            )
         self.current_charge = current
         self.run_record.record_current_charge_power(current)
         if current < required:
@@ -191,7 +204,7 @@ class GamepadChargePlan(ZOperation):
     @node_from(from_name='执行单次挑战', success=False, status=STATUS_CHARGE_NOT_ENOUGH)
     @operation_node(name='电量不足返回大世界', node_max_retry_times=15, timeout_seconds=20)
     def return_after_shortage(self) -> OperationRoundResult:
-        """全部受支持计划均需一百电量，不足时结束并保留未完成次数。"""
+        """当前计划电量不足时结束并保留次数，不自动恢复或更换计划。"""
         if self.last_screenshot is None:
             return self.round_retry('截图无效', wait=1)
         if self.round_by_find_area(
