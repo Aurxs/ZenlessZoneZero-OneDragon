@@ -1,0 +1,37 @@
+screen_id: city_fund
+added_areas:
+- area_name: 手柄-主标签
+  area_type: none
+  pc_rect:
+  - 1135
+  - 10
+  - 1860
+  - 100
+- area_name: 手柄-任务分类
+  area_type: none
+  pc_rect:
+  - 1175
+  - 115
+  - 1850
+  - 195
+- area_name: 手柄-标题
+  area_type: none
+  pc_rect:
+  - 25
+  - 470
+  - 345
+  - 585
+- area_name: 手柄-底部提示
+  area_type: none
+  pc_rect:
+  - 1080
+  - 975
+  - 1880
+  - 1060
+- area_name: 手柄-任务状态
+  area_type: none
+  pc_rect:
+  - 1550
+  - 220
+  - 1880
+  - 975

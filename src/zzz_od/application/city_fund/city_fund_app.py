@@ -1,6 +1,8 @@
+import sys
+
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
-from one_dragon.base.operation.operation_notify import node_notify, NotifyTiming
+from one_dragon.base.operation.operation_notify import NotifyTiming, node_notify
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
 from zzz_od.application.city_fund import city_fund_const
 from zzz_od.application.zzz_application import ZApplication
@@ -24,7 +26,22 @@ class CityFundApp(ZApplication):
             op_name=city_fund_const.APP_NAME,
         )
 
-    @operation_node(name='打开菜单', is_start_node=True)
+    @operation_node(name='选择输入方式', is_start_node=True)
+    def choose_input_mode(self) -> OperationRoundResult:
+        """Mac 使用原生手柄领奖，其他平台保留原流程。"""
+        return self.round_success('手柄丽都城募' if sys.platform == 'darwin' else None)
+
+    @node_from(from_name='选择输入方式', status='手柄丽都城募')
+    @node_notify(when=NotifyTiming.CURRENT_DONE)
+    @operation_node(name='手柄丽都城募')
+    def run_gamepad_rewards(self) -> OperationRoundResult:
+        """沿用应用入口和运行记录，不进入购买或 PC 坐标流程。"""
+        from zzz_od.operation.gamepad.rewards_city_fund import GamepadCityFund
+
+        return self.round_by_op_result(GamepadCityFund(self.ctx).execute())
+
+    @node_from(from_name='选择输入方式')
+    @operation_node(name='打开菜单')
     def open_menu(self) -> OperationRoundResult:
         op = GotoMenu(self.ctx)
         return self.round_by_op_result(op.execute())
@@ -95,3 +112,4 @@ def __debug():
 
 if __name__ == '__main__':
     __debug()
+

@@ -8,7 +8,8 @@ from qfluentwidgets import FluentIcon
 from one_dragon_qt.view.standalone_app_run_interface import StandaloneRunInterface
 from one_dragon_qt.widgets.setting_card.help_card import HelpCard
 from zzz_od.macos.application_capabilities import (
-    MACOS_CHARGE_PLAN_LIMITS,
+    MACOS_APP_SUMMARY,
+    get_macos_app_limits,
     get_macos_app_unavailable_reason,
 )
 
@@ -35,7 +36,7 @@ class ZStandaloneAppRunInterface(StandaloneRunInterface):
         if sys.platform == 'darwin':
             card = HelpCard(
                 title='Mac 适配范围',
-                content=f'{MACOS_CHARGE_PLAN_LIMITS}。其他应用仍可查看和配置，运行前会检查适配范围。',
+                content=f'{MACOS_APP_SUMMARY}。应用仍可查看和配置。',
             )
             card.setFixedHeight(100)
             card.contentLabel.setWordWrap(True)
@@ -57,7 +58,7 @@ class ZStandaloneAppRunInterface(StandaloneRunInterface):
             return
         for card in self.app_list_widget._cards:
             reason = get_macos_app_unavailable_reason(card.app_id)
-            card.content_widget.setContent(reason or MACOS_CHARGE_PLAN_LIMITS)
+            card.content_widget.setContent(reason or get_macos_app_limits(card.app.app_id))
             card.content_widget.titleLabel.setEnabled(reason is None)
 
     def _on_app_selected(self, app_id: str) -> None:

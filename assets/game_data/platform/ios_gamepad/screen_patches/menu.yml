@@ -14,3 +14,10 @@ added_areas:
   - 585
   - 1255
   - 665
+- area_name: 手柄-底部应用
+  area_type: none
+  pc_rect:
+  - 250
+  - 905
+  - 1645
+  - 1065

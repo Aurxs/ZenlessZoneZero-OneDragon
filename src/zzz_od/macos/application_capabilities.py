@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from one_dragon.base.config.one_dragon_config import AfterDoneOpEnum, InstanceRun
 from one_dragon.base.operation.application import application_const
 from zzz_od.application.charge_plan import charge_plan_const
+from zzz_od.application.city_fund import city_fund_const
 from zzz_od.application.coffee import coffee_app_const
 from zzz_od.application.engagement_reward import engagement_reward_const
 from zzz_od.application.random_play import random_play_const
@@ -20,13 +21,29 @@ MACOS_CHARGE_PLAN_LIMITS: str = (
     'Mac 目前仅支持基础材料调查专项、默认等级、默认五卡、一张或五张卡片、当前编队；'
     '每场核对实际消耗20或100电量，不自动补电量'
 )
+MACOS_APP_SUMMARY: str = (
+    'Mac 已支持录像店、汀曼咖啡、体力计划、活跃度奖励和丽都城募；'
+    '其余任务以卡片上的适配提示为准'
+)
 MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     application_const.ONE_DRAGON_APP_ID,
     charge_plan_const.APP_ID,
     random_play_const.APP_ID,
     coffee_app_const.APP_ID,
+    city_fund_const.APP_ID,
     engagement_reward_const.APP_ID,
 })
+
+
+def get_macos_app_limits(app_id: str) -> str:
+    """让每个任务显示自身范围，避免商店按钮误显示战斗限制。"""
+    return {
+        charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,
+        random_play_const.APP_ID: 'Mac 支持澄辉坪营业点、随机或已选宣传员和推荐上架；指定人物移焦尚未支持',
+        coffee_app_const.APP_ID: 'Mac 已验证澄辉坪汀曼特调与今日已喝；其他入口和额外咖啡尚未实测',
+        engagement_reward_const.APP_ID: 'Mac 支持活跃度领奖、满档判断及已领取跳过',
+        city_fund_const.APP_ID: 'Mac 支持现有成长任务与等级奖励领取，不购买等级或升级计划',
+    }.get(app_id, MACOS_APP_SUMMARY)
 
 
 def get_macos_app_unavailable_reason(app_id: str) -> str | None:

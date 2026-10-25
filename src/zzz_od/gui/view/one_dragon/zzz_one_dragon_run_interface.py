@@ -8,7 +8,8 @@ from qfluentwidgets import BodyLabel, FluentIcon, PushButton
 from one_dragon.utils.log_utils import log
 from one_dragon_qt.view.one_dragon.one_dragon_run_interface import OneDragonRunInterface
 from zzz_od.macos.application_capabilities import (
-    MACOS_CHARGE_PLAN_LIMITS,
+    MACOS_APP_SUMMARY,
+    get_macos_app_limits,
     get_macos_app_unavailable_reason,
     get_macos_one_dragon_unavailable_reason,
 )
@@ -44,7 +45,7 @@ class ZOneDragonRunInterface(OneDragonRunInterface):
         if sys.platform != 'darwin':
             return top
         self.macos_status_label: BodyLabel = BodyLabel(
-            f'{MACOS_CHARGE_PLAN_LIMITS}。其他任务标记为「Mac暂未适配」；'
+            f'{MACOS_APP_SUMMARY}。'
             '准备游戏会按需启动游戏、进入已保存账号并确认手柄模式。'
             '触屏模式下会短暂置前游戏并使用鼠标，切手柄后恢复。',
         )
@@ -73,7 +74,7 @@ class ZOneDragonRunInterface(OneDragonRunInterface):
         for card in self.app_run_list._app_cards:
             reason = get_macos_app_unavailable_reason(card.app.app_id)
             card.run_btn.setEnabled(reason is None)
-            card.run_btn.setToolTip(reason or MACOS_CHARGE_PLAN_LIMITS)
+            card.run_btn.setToolTip(reason or get_macos_app_limits(card.app.app_id))
             card.content_widget.titleLabel.setEnabled(reason is None)
             if reason is not None:
                 card.content_widget.setTitle(f'{card.app.app_name} · Mac暂未适配')
@@ -81,7 +82,7 @@ class ZOneDragonRunInterface(OneDragonRunInterface):
             # 保留原启用值；已启用的未适配任务允许用户主动关闭。
             card.switch_btn.setEnabled(reason is None or card.app.enabled)
             card.switch_btn.setToolTip(
-                f'{reason}；可关闭已有启用项' if reason is not None else MACOS_CHARGE_PLAN_LIMITS,
+                f'{reason}；可关闭已有启用项' if reason is not None else get_macos_app_limits(card.app.app_id),
             )
 
     def on_context_state_changed(self) -> None:
