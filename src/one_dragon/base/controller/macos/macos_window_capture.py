@@ -11,6 +11,8 @@ from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Any
 
+import numpy as np
+
 from one_dragon.base.controller.macos.sck_frame_converter import (
     CapturedFrame,
     bgra_buffer_to_rgb,
@@ -34,6 +36,23 @@ class MacWindow:
     width: int
     height: int
     on_screen: bool = True
+
+
+@dataclass(frozen=True)
+class CaptureDiagnostics:
+    """只读采集状态；回调到达时间与原生有效观察时间分开记录。"""
+
+    running: bool
+    active: bool
+    requires_pixel_change: bool
+    content_verified: bool
+    sequence: int
+    sample_status: int | None
+    sample_counts: dict[int, int]
+    callback_age_seconds: float | None
+    content_age_seconds: float | None
+    observation_age_seconds: float | None
+    error: str | None
 
 
 def _initialize_appkit(appkit: Any) -> None:
@@ -88,9 +107,14 @@ def _native_api() -> Any:
                 self._capture._fail_stream(stream, f'窗口采集已停止: {error}')
 
         def streamDidBecomeInactive_(self, stream: Any) -> None:
-            """共享窗口变为非活动状态时暂停，不据此推断窗口已经关闭。"""
+            """共享内容暂不可用时清帧，保留流以接收系统恢复通知。"""
             if self._capture is not None:
-                self._capture._fail_stream(stream, '窗口采集已变为非活动状态，已暂停；请确认目标窗口可采集后重新连接')
+                self._capture._set_stream_active(stream, False)
+
+        def streamDidBecomeActive_(self, stream: Any) -> None:
+            """恢复通知本身不是有效帧，仍等待新的像素缓冲。"""
+            if self._capture is not None:
+                self._capture._set_stream_active(stream, True)
 
     return (CoreMedia, dispatch, Foundation, Quartz, ScreenCaptureKit, SckWindowOutput)
 
@@ -108,6 +132,13 @@ class MacWindowCapture:
         self._output: Any = None
         self._queue: Any = None
         self._running: bool = False
+        self._active: bool = True
+        self._activity_generation: int = 0
+        self._requires_pixel_change: bool = False
+        self._content_verified: bool = False
+        self._last_sample_monotonic: float | None = None
+        self._sample_status: int | None = None
+        self._sample_counts: dict[int, int] = {}
         self._latest: CapturedFrame | None = None
         self._last_observation_monotonic: float | None = None
         self._freshness_error: str | None = None
@@ -129,6 +160,28 @@ class MacWindowCapture:
         """返回原生像素缓冲尺寸，不把逻辑点误报为像素。"""
         with self._lock:
             return self._raw_size
+
+    def diagnostics(self) -> CaptureDiagnostics:
+        """读取流状态，不枚举窗口、不更新任何有效帧时间。"""
+        with self._lock:
+            now = time.monotonic()
+            return CaptureDiagnostics(
+                running=self._running,
+                active=self._active,
+                requires_pixel_change=self._requires_pixel_change,
+                content_verified=self._content_verified,
+                sequence=self._sequence,
+                sample_status=self._sample_status,
+                sample_counts=dict(self._sample_counts),
+                callback_age_seconds=(
+                    None if self._last_sample_monotonic is None else now - self._last_sample_monotonic
+                ),
+                content_age_seconds=None if self._latest is None else now - self._latest.monotonic_time,
+                observation_age_seconds=(
+                    None if self._last_observation_monotonic is None else now - self._last_observation_monotonic
+                ),
+                error=self._last_error or self._freshness_error,
+            )
 
     def _wait(self, invoke: Callable[[Callable[..., None]], None], operation: str) -> tuple[Any, ...]:
         """有界等待原生异步完成；主线程等待时仍处理 Cocoa 回调。"""
@@ -158,7 +211,7 @@ class MacWindowCapture:
         return result
 
     def _shareable_windows(self) -> list[Any]:
-        """从 SCK 获取当前窗口，权限不足时给出明确错误。"""
+        """枚举所有 Space 的窗口，不以当前桌面可见性过滤目标。"""
         sck = _native_api()[4]
         content, error = self._wait(
             lambda completion: sck.SCShareableContent
@@ -250,6 +303,9 @@ class MacWindowCapture:
         with self._lock:
             self._stream, self._output, self._queue = stream, output, queue
             self._running = True
+            self._active = bool(selected.isOnScreen())
+            self._requires_pixel_change = not self._active
+            self._content_verified = False
             self._last_error = None
             self._content_rect = content_rect
             self._top_inset_pixels = top_inset_pixels
@@ -262,12 +318,31 @@ class MacWindowCapture:
             self.stop()
             raise
 
+    def _set_stream_active(self, stream: Any, active: bool) -> None:
+        """暂时失活不销毁流；恢复只接受新的 Complete，不复用失活前像素。"""
+        with self._lock:
+            if not self._running or stream != self._stream or self._active == active:
+                return
+            self._active = active
+            self._activity_generation += 1
+            self._requires_pixel_change = not active
+            self._content_verified = False
+            self._latest = None
+            self._last_observation_monotonic = None
+            self._freshness_error = None
+            self._last_error = (
+                '窗口采集已恢复活动，等待新的完整画面' if active
+                else '共享窗口暂不可采集，等待系统恢复；未切换桌面'
+            )
+
     def _fail_stream(self, stream: Any, error: str) -> None:
         """异常、窗口关闭和权限撤销后立即使旧帧失效。"""
         with self._lock:
             if stream != self._stream:
                 return
             self._running = False
+            self._active = False
+            self._content_verified = False
             self._latest = None
             self._last_observation_monotonic = None
             self._freshness_error = None
@@ -279,6 +354,7 @@ class MacWindowCapture:
         with self._lock:
             if not self._running or stream != self._stream:
                 return
+            activity_generation = self._activity_generation
         if output_type != sck.SCStreamOutputTypeScreen or not cm.CMSampleBufferIsValid(sample):
             return
         try:
@@ -287,6 +363,13 @@ class MacWindowCapture:
                 raise MacCaptureError('采集帧缺少元数据')
             metadata = attachments[0]
             status = metadata.get(sck.SCStreamFrameInfoStatus)
+            with self._lock:
+                if not self._running or stream != self._stream:
+                    return
+                self._last_sample_monotonic = time.monotonic()
+                self._sample_status = None if status is None else int(status)
+                if self._sample_status is not None:
+                    self._sample_counts[self._sample_status] = self._sample_counts.get(self._sample_status, 0) + 1
             if status == sck.SCFrameStatusIdle:
                 # Idle 表示画面没有变化，不生成新像素；只能更新该流的观察时间。
                 try:
@@ -299,7 +382,9 @@ class MacWindowCapture:
                 except (KeyError, TypeError, ValueError):
                     return
                 with self._lock:
-                    if not self._running or stream != self._stream or self._latest is None:
+                    if (not self._running or stream != self._stream or self._latest is None
+                            or activity_generation != self._activity_generation
+                            or self._requires_pixel_change):
                         return
                     previous = self._last_observation_monotonic
                     if observed_at >= max(self._latest.monotonic_time, previous or self._latest.monotonic_time):
@@ -313,6 +398,7 @@ class MacWindowCapture:
                 with self._lock:
                     if self._running and stream == self._stream:
                         self._latest = None
+                        self._content_verified = False
                         self._last_observation_monotonic = None
                         self._freshness_error = None
                         self._last_error = f'窗口暂时没有可用画面，采集状态: {status}'
@@ -350,8 +436,18 @@ class MacWindowCapture:
             )
             image.flags.writeable = False
             with self._lock:
-                if not self._running or stream != self._stream:
+                if (not self._running or stream != self._stream
+                        or activity_generation != self._activity_generation):
                     return
+                # 跨 Space 的冻结画面也可能连续标为 Complete 且带新时间戳。
+                # 首帧只作比较基准；后续只有像素变化才能授权输入。
+                if self._requires_pixel_change:
+                    previous = self._latest
+                    if previous is not None and np.array_equal(previous.image, image):
+                        return
+                    self._content_verified = previous is not None
+                else:
+                    self._content_verified = True
                 self._sequence += 1
                 self._raw_size = (width, height)
                 self._latest = CapturedFrame(image, self._sequence, capture_time, monotonic_time, width, height)
@@ -369,10 +465,17 @@ class MacWindowCapture:
             frame = self._latest
             if not self._running or frame is None:
                 return None
+            if self._requires_pixel_change and not self._content_verified:
+                # 初始化允许在原有帧龄期限内等第二张不同的图，不能把首帧
+                # 尚未验证当成立即终止条件，也不能把它提供给输入层。
+                if time.monotonic() - frame.monotonic_time > max_age_seconds:
+                    self._freshness_error = '跨桌面尚未观察到画面变化，游戏可能已暂停渲染；拒绝使用冻结画面'
+                return None
             observed_at = self._last_observation_monotonic
             age = time.monotonic() - max(frame.monotonic_time, observed_at or frame.monotonic_time)
             if not 0 <= age <= max_age_seconds:
-                self._freshness_error = f'窗口采集已过期，最近有效观察距今 {age:.3f} 秒'
+                reason = '跨桌面画面未变化，游戏可能已暂停渲染' if self._requires_pixel_change else '窗口采集已过期'
+                self._freshness_error = f'{reason}，最近有效观察距今 {age:.3f} 秒'
                 return None
             return frame
 
@@ -405,6 +508,12 @@ class MacWindowCapture:
             stream, output = self._stream, self._output
             self._stream = self._output = self._queue = None
             self._running = False
+            self._active = False
+            self._requires_pixel_change = False
+            self._content_verified = False
+            self._last_sample_monotonic = None
+            self._sample_status = None
+            self._sample_counts.clear()
             self._latest = None
             self._last_observation_monotonic = None
             self._freshness_error = None
