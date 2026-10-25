@@ -1,0 +1,16 @@
+screen_id: map
+added_areas:
+- area_name: 手柄-区域卡片
+  area_type: none
+  pc_rect: [0, 95, 1920, 930]
+- area_name: 手柄-传送点卡片
+  area_type: none
+  pc_rect: [55, 928, 1865, 1075]
+- area_name: 手柄-传送确认主句
+  area_type: text
+  pc_rect: [800, 490, 1140, 570]
+  text: 是否传送至该地点
+  lcs_percent: 0.9
+- area_name: 手柄-传送确认按钮
+  area_type: none
+  pc_rect: [970, 595, 1255, 660]
