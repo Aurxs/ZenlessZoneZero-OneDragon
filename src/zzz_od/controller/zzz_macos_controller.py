@@ -12,7 +12,7 @@ from one_dragon.base.controller.controller_base import (
     ControllerBase,
     ScreenshotWithTime,
 )
-from one_dragon.base.controller.gamepad_input import normalize_gamepad_key
+from one_dragon.base.controller.gamepad_input import GamepadState, normalize_gamepad_key
 from one_dragon.utils import cv2_utils
 from one_dragon.utils.log_utils import log
 from zzz_od.const import game_const
@@ -269,6 +269,10 @@ class ZMacController(ControllerBase):
         try:
             while not stop.wait(interval):
                 frame = self.window_capture.latest_frame(max_age_seconds=self.macos_config.max_frame_age_seconds)
+                if frame is None and self.gamepad.is_connected and self.gamepad.state == GamepadState():
+                    # 中立状态没有需要中断的长按；新动作仍会独立检查帧龄。
+                    # 避免静止菜单的短暂回调延迟把整个会话永久锁在暂停状态。
+                    continue
                 if frame is None or not self.gamepad.is_connected:
                     self.pause_input()
                     log.error('Mac 输入已暂停：%s', self.window_capture.last_error or '窗口帧或输入连接失效')
