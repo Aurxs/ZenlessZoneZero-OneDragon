@@ -58,7 +58,7 @@ class ZStandaloneAppRunInterface(StandaloneRunInterface):
             return
         for card in self.app_list_widget._cards:
             reason = get_macos_app_unavailable_reason(card.app_id)
-            card.content_widget.setContent(reason or get_macos_app_limits(card.app.app_id))
+            card.content_widget.setContent(reason or get_macos_app_limits(card.app_id))
             card.content_widget.titleLabel.setEnabled(reason is None)
 
     def _on_app_selected(self, app_id: str) -> None:
