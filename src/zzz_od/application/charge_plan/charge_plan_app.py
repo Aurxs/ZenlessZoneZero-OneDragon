@@ -1,4 +1,7 @@
-from typing import ClassVar
+from __future__ import annotations
+
+import sys
+from typing import TYPE_CHECKING, ClassVar
 
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation_edge import node_from
@@ -27,6 +30,9 @@ from zzz_od.operation.compendium.notorious_hunt import NotoriousHunt
 from zzz_od.operation.compendium.tp_by_compendium import TransportByCompendium
 from zzz_od.operation.exchange_ether_battery import ExchangeEtherBattery
 
+if TYPE_CHECKING:
+    from one_dragon.base.operation.operation_base import OperationResult
+
 
 class ChargePlanApp(ZApplication):
     """体力计划:按计划消耗电量刷训练副本(实战模拟室/区域巡防/专业挑战室/恶名狩猎-深度追猎)及电量合成(合成电池),支持循环与电量不足时用储蓄电量/以太电池补体。各分类按电量消耗,无日/周次数限。"""
@@ -34,6 +40,7 @@ class ChargePlanApp(ZApplication):
     STATUS_NO_PLAN: ClassVar[str] = '没有可运行的计划'
     STATUS_ROUND_FINISHED: ClassVar[str] = '已完成一轮计划'
     STATUS_FIND_NEXT_PLAN: ClassVar[str] = '继续查找下一个计划'
+    STATUS_MACOS_PLAN: ClassVar[str] = '运行 Mac 体力计划'
 
     def __init__(self, ctx: ZContext):
         ZApplication.__init__(
@@ -60,6 +67,16 @@ class ChargePlanApp(ZApplication):
         self.current_plan: ChargePlanItem | None = None
         self.double_reward_checked: bool = False  # 本次运行是否已检查过双倍活动
 
+    def execute(self) -> OperationResult:
+        """Mac 在启动游戏或修改计划进度前，检查整份计划的支持范围。"""
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.charge_plan import validate_macos_charge_plan
+
+            reason = validate_macos_charge_plan(self.config)
+            if reason is not None:
+                return self.op_fail(reason)
+        return super().execute()
+
     @operation_node(name='开始体力计划', is_start_node=True)
     def start_charge_plan(self) -> OperationRoundResult:
         self.temp_plan = None
@@ -70,7 +87,18 @@ class ChargePlanApp(ZApplication):
         current_dt = self.run_record.get_current_dt()
         if self.config.try_reset_plan_times_by_dt(current_dt):
             log.info('已按游戏刷新日重置体力计划已运行次数 %s', current_dt)
+        if sys.platform == 'darwin':
+            return self.round_success(self.STATUS_MACOS_PLAN)
         return self.round_success()
+
+    @node_from(from_name='开始体力计划', status=STATUS_MACOS_PLAN)
+    @operation_node(name='运行 Mac 体力计划')
+    def run_macos_plan(self) -> OperationRoundResult:
+        """复用用户保存的体力计划，经已验证的手柄操作逐场执行。"""
+        from zzz_od.operation.gamepad.charge_plan import GamepadChargePlan
+
+        op = GamepadChargePlan(self.ctx, self.config, self.run_record)
+        return self.round_by_op_result(op.execute())
 
     @node_from(from_name='挑战完成')
     @node_from(from_name='开始体力计划')

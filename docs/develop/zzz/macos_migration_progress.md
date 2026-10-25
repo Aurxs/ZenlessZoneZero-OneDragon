@@ -1,0 +1,150 @@
+# macOS 迁移实施进度
+
+更新时间：2026-10-25。后续会话先读本文件，再按当前阶段阅读设计与源码；完成一项验证后更新对应状态，不把计划当作已实现。
+
+## 已对齐的目标与授权
+
+- 长期目标：完整迁移绝区零一条龙到 Mac，并持续合并上游更新。
+- 最终必须全程由一条龙操作；CUA 只是开发观察工具，不能作为运行依赖，不能要求用户每次手动打开设置或切换手柄。自动任务使用 PlayCover 的原生手柄界面，优先后台运行、不抢键鼠；不开发完整触屏版流程。用户允许首次登录、输入类型切换及无法手柄覆盖环节的必要点击，需要前台时逐处记录，不默默回退为全程抢键鼠。
+- 必须实现启动前置：检测当前输入模式 → 必要时由独立 Mac 启动交互层执行明确点击 → 切换手柄 → 截图确认 → 进入自动任务。仅新增兼容/启动适配层，不修改已有 Windows、OJD 或 HID 底层输入代码。
+- 用户明确要求优先复用已有手柄模式：已是手柄大世界时只识别并确认，零鼠标输入；能用手柄继续的已建档画面使用手柄键。仅在识别到触屏画面的正面特征后才临时使用前台点击切换。用户进一步要求「准备游戏」在游戏未打开时直接冷启动；该扩展尚未实测。
+- **固定架构边界（用户最新明确要求）：不修改已有底层输入代码，不重写 Windows Xbox/DS4 实现、OJD 或 HID 驱动。新增手柄输入抽象及 Mac 兼容层，由适配器调用已有输入服务。上层只表达按键、摇杆和释放，不依赖具体平台库。**
+- **移动端手柄模式下触屏失效**：不能沿用 Windows 的“手柄战斗＋鼠标菜单”。必要点击优先在切入手柄前完成；若需要返回触屏，必须明确设计模式切换与恢复，不能直接点屏幕假定有效。
+- 用户要求验证快速、聚焦关键行为；关键输入验证通过后进入开发，不继续扩展浏览器/系统兼容性矩阵。
+- 第一条完整任务：一条龙自动完成输入模式检测、按需切手柄和截图确认 → 大世界 → 实战模拟室 → 编队/战斗/结算/重复 → 返回大世界。当前已登录会话入口只是临时状态，手动切手柄不能作为最终完成标准；原型自动攻击也不等于完整任务。
+- 用户确认：M3 Max、36GB，游戏能正常游玩，蓝牙 Xbox 兼容手柄可用；猜测为 Xbox 360 协议，尚未核验设备身份。
+- 目标档位：M3 及以上、16GB；8GB 或 M2 及以下尽力支持。
+- 用户于本轮明确授权按方案实施，并可使用 Computer Use 操作本机 PlayCover 测试。可继续必要的源码修改、依赖准备与聚焦验证；无需重复询问是否开始。
+- 用户已明确批准安装并运行官方 OJD 0.6.0-alpha.1，并自行授予所需权限。用户已要求组件可运行完成后创建主仓、测试仓配对的检查点提交；尚未授权 push、付费购买或降低系统保护。USB 驱动扩展不作为本轮前提。
+
+## 文档分工
+
+- [代码方案](macos_migration.md)：文件、接口、阶段和完成标准。
+- [手柄调研](macos_gamepad_research.md)：2026-10-25 核实的候选、固定版本及来源，不代表本机验证结果。
+- 本文件：实施现状、证据、未完成项与下一步。不在 AGENTS.md 中堆进度，不复制整份设计。
+
+## 仓库状态
+
+- 工作目录：`/Users/aurxs/Program/ZenlessZoneZero-OneDragon`。
+- `origin`：`https://github.com/Aurxs/ZenlessZoneZero-OneDragon.git`。
+- `upstream`：`https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon`。
+- 基线：`8fe22ef0cf127f596ba6b28047416fb68dacc797`。
+- fork 已创建并在原目录拉取，原配置/资源保留。方案和调研文档尚未提交。
+- 主仓已创建 `codex/macos-migration`；测试仓已 fork 为 `Aurxs/zzz-od-test` 并克隆到根目录，同名分支，origin/upstream 对应 fork/原仓。
+- 测试仓首次网络中断后采用稀疏检出，随当前改动补充所需测试目录；未删除或削弱上游测试。
+
+## 阶段状态
+
+| 阶段 | 状态 | 证据或剩余事项 |
+|---|---|---|
+| 文档与 fork | 已完成 | 两份方案文档、README 索引、远程及本地版本一致 |
+| P0 原生手柄/后台验证 | 基础输入已通过 | Safari 和游戏均识别；原始持久 CLI 的 East 短按返回菜单、游戏后台 South 进入登录奖励页；不代表战斗或完整后台流程通过 |
+| P1 依赖与导入 | 运行入口、真实初始化与 GUI 准备已通过 | 原生 Cocoa 完整 AppWindow 的 9 页构造成功；Mac 实例 02、模型、真实 ctx 初始化、截图 OCR 和 flash CPU 已通过；GUI 已登录会话自动切手柄通过，冷启动登录与完整任务继续联调 |
+| P2 Mac 控制器/窗口采集 | 采集、释放和游戏按键已通过 | 新兼容层游戏按键已有真实响应；同桌面继续流程联调，跨 Space 采集留待后续，完整应用生命周期尚待完成 |
+| P3 实战模拟室闭环 | 当前桌面默认调查专项单次通过 | 15:43:22—15:44:16 完整自动导航、战斗、结算并返回大世界，exit 0、completed_battles=1；GUI 已登录会话准备于16:46通过，冷启动登录、体力计划与更多分支仍待完成 |
+| P4 性能与更多应用 | 未开始 | CPU 基线后逐模型考虑 Core ML，16GB 需要实机验证 |
+| P5 安装与更新 | 未开始 | 不在签名 app 内 Git 更新源码，不自动更新到官方 Windows 分支 |
+
+## 本机已观察事实
+
+- `sw_vers`：macOS **26.7.1**，build **25G241**；`uname -m`：arm64。
+- 已有 uv 与系统 Swift；项目 `.venv` 为 Python 3.11.14。ORT 1.24.4 能导入并列出 CoreML/CPU provider，ScreenCaptureKit.SCStream 能导入；这不是推理/采集实测通过。
+- PlayCover **3.1.0 / 1633**；游戏 bundle `com.miHoYo.Nap`，版本 **3.3.0 / 8**，实际 app 位于 `/Users/aurxs/Library/Containers/io.playcover.PlayCover/Applications/com.miHoYo.Nap.app`。`~/Applications/PlayCover/绝区零.app` 的同名入口无法由 CUA 正常打开，应使用实际路径。
+- 早期游戏从登录页进入登录奖励页；先前调试出现重复挑战，之后已完成当前桌面默认调查专项的受控单次自动验收并返回 HIA 大世界。登录前右侧设置 → 输入 → UI 布局可打开；无已识别手柄时下拉只有“触屏”，持续连接虚拟手柄并重启后出现“手柄”。早期截图 `.debug/macos/login-input-touch-only.png` 仅记录未识别设备时的状态。
+- PlayTools 版本、实体手柄准确身份、完整后台渲染和战斗行为仍待验证；后台 South 菜单响应已有实机证据。
+
+## 已完成的实现与验证
+
+- 统一 `pyproject.toml` / `uv.lock` 增加 Darwin arm64 与 Windows 依赖条件；原 121 个锁包版本未升级。Mac GUI 现有传递依赖会引入较多 PyObjC 框架。
+- vgamepad 0.1.0 的 setup.py 在 Darwin 拒绝生成元数据；使用针对该固定版本的 `tool.uv.dependency-metadata` 声明 Windows 运行依赖为空，避免更改其安装行为。
+- Xbox/DS4 枚举移到纯数据模块；GameConfig/设置页改用纯枚举。Win32 剪贴板、键鼠控制器、按键监听按平台延迟导入；转向类型引用移入 TYPE_CHECKING。
+- 上述枚举拆分中对原 Xbox/DS4 实现文件的改动已按用户新边界撤回，并确认这两个文件与基线完全一致。跨平台数据/按键映射由新增兼容层承载；不得为了共享枚举再次修改既有设备实现。
+- Mac 上不创建全局键鼠监听，键位录制设置禁用，调试截图不激活 Windows 窗口。设置页已隔离 Overlay、Windows 截图和键鼠快捷键，图片目录与剪贴板使用 Qt 接口。
+- 新增 `game_session_entry`，`ZApplication` / `ZOperation` / `ZOneDragonApp` 通过它进入游戏会话；Mac 不导入 Windows 登录流程，恢复时不激活游戏窗口。原一条龙保留任务列表与顺序，运行前检查当前实例、结束后操作和启用任务的适配范围；尚未开放全部应用。
+- Darwin 账户页已增加 `platform`、游戏 bundle ID、OJD 路径和顶部裁剪像素整数配置；旧 PC 实例不自动改写。修改相关配置会暂停运行、清理旧服务，并提示重启。
+- 新增 `python -m zzz_od.macos.main` 源码入口；Mac 重启使用当前 Python，跳过 Windows launcher 更新并保留模型检查。初始化失败保存 `initialization_error`，不发送 ready，也不继续等待至运行超时。
+- 原生 Cocoa 下完整 `AppWindow` 构造成功，包含 9 个页面。完整窗口在 offscreen 模式下会于第三方 `qframelesswindow` 原生代码段错误；普通控件的 offscreen 检查正常。这个无头环境结果不能当作 Mac 原生窗口构造失败。本轮已下载 OCR ppocrv6 与 flash 模型，创建并选择 Mac 实例 02，保留 PC 实例 01。真实 `ctx.init()` 用时约 1.259 秒、`ready=true`；截图 OCR 已识别“点击进入游戏”，flash CPU 初始化成功。Mac 音频路径已隔离，新增 2 项聚焦测试通过；这些结果不代表自动切手柄或完整游戏任务通过。
+- 新增 `tools/macos/gamepad_probe.py` 和 `gamecontroller_probe.swift`。前者默认只读、显式有限动作、完整状态和退出释放；后者只读观察原生 GameController。
+- OJD CLI 由 argv[0] 名称 `ojd` 选择；不能把 symlink resolve 成 `OpenJoystickDriver` 后调用。探测器已修复并增加回归测试。本地 `.install/ojd/ojd` 链接到已安装 app，官方 `/usr/local/bin/ojd` 也已存在。
+- 此前 **42 项独立聚焦测试通过**：探测器 7、Mac 导入 4、上下文输入隔离 2、采集 5、采集初始化 3、OJD 客户端 6、Mac 控制器 11、窗口选择 1、输入生命周期 3。Swift 编译及短时只读/信号清理验证通过；相关 Ruff 检查仍报已有的 KeySettingCard B008、Operation SIM910 和 GameAccountConfig SIM114，本轮未为这些无关问题扩大修改。未运行全量测试，不重复运行已明确通过的检查。
+- 运行入口阶段新增 33 项聚焦测试通过：会话入口 11、设置 6、账户配置 3、源码启动 2、初始化失败处理 5、采集裁剪 4、Mac 音频隔离 2。另有 3 项相关原测试随该阶段改动重跑，不重复计数。
+- 后续新增验证按模块记录：手柄手册传送 4、资源 profile 4、后端 3、OJD 短按 1、采集 idle 帧 2、启动指针 3 项通过；新战斗输入保护 3 项、begin 兼容 / 旧 mock 相关 2 项、完整 Operation 4 项及相关 Ruff 通过。开发仍在继续，不把各批次简单相加写成最终总数。
+- 已新增 `GamepadInput` / `GamepadState`、`OjdGamepadClient`、`MacWindowCapture` / 帧转换、`ZMacController`、`MacOsConfig`，以及显式 `macos_playcover` 平台配置。Mac 控制器直接继承 `ControllerBase`，不依赖 Windows 控制器。
+- 暂停发送中立状态并拒绝迟到动作；恢复要求有效新帧和可用连接；断线清空状态、不重放旧动作。窗口帧过期时暂停输入。以上行为已有代码和聚焦测试，完整应用生命周期仍待实机接入。
+- 新 OJD 适配器已与 SCK 一起完成真实 `ZMacController` 初始化、暂停中立和关闭验证。后续通过新 OJD / MCP 兼容层完成真实按键操作并看到游戏响应，已不再只有原始 CLI 证据；详情见下节。
+- 本机 uv 全局默认镜像会改变 lock 源；后续依赖命令显式用 `--default-index https://pypi.org/simple`，或直接使用 `.venv/bin/python` / `.venv/bin/ruff`，不要反复改写锁文件。
+
+## OJD 实机结果（基础输入已通过）
+
+- 官方 DMG SHA-256：`d2b771ffe4382b7bfd218932c7003227216d334a14154e95976c4f114b1c2056`，与 release 一致。
+- app 签名有效，Developer ID Team `9PQP6CDMQT`，附公证票据，`com.apple.developer.hid.virtual.device=true`。已安装到 `/Applications/OpenJoystickDriver.app`；USB 扩展未注册。
+- 用户批准安装后自行授予权限。CLI status：服务 Running / 0.6.0-alpha.1，`inputRead`、`inputInject` 均 Granted。
+- 10 秒中立 feed CLI 返回 0；`hidutil list` 实际看到 `045E:0B13`、Transport=Virtual、IOHIDUserDevice、Xbox Wireless Controller。因此虚拟 HID 创建已通过。
+- 同时运行或设备创建后运行命令行 GameController 观察器，均 `controllers_seen=0`。但后续 `GCController.supportsHIDDevice` 返回 **true**；该检查 IOHIDManagerOpen 同时返回权限错误，不能把这个进程的观察结果外推到所有应用。
+- 用户在 **Safari** 的 `https://www.gamepadtester.cn` 已看到 **Xbox Wireless Controller Extended Gamepad**，P1 绿色；截图已保存 `.debug/macos/user-safari-gamepad-detected.png`。这是实际应用识别的阳性证据，不能继续用命令行枚举 0 断言系统拒绝虚拟手柄。
+- 本机 `AppleGameControllerPersonality.kext/Contents/Info.plist` 没有 `GCIOMatchVirtual`，而固定 OJD 匹配测试要求该项为 true。保留为系统差异，不能据此宣布失败原因；Safari 结果要求继续检查观察器运行环境与目标游戏。
+- `--appkit` 诊断模式直接 exec 时 activationPolicy=-1，无法设为 prohibited，安全退出；未执行监听。这种启动失败不计作“枚举到 0”。实体手柄暂时不在用户身边，无法做实体对照。
+- 早期检查时 PlayCover 的“启用键盘映射布局”为关闭；本轮重新读取时键盘映射和智能映射均为开启。这里只记录观察结果，未修改这两个开关；已安装 PlayTools。
+- 用户授权重启游戏后，持续连接虚拟手柄并重启游戏，UI 布局下拉已出现“手柄”，选择后界面显示 A/B 提示；用户也确认游戏和 Safari 都识别到设备。
+- 用同一持久 CLI 发送 East 100ms + 中立帧，游戏从设置返回登录页。将 PlayCover 应用库 Raise 并点击后，发送 South 100ms + 中立帧，游戏成功进入登录奖励页。基础短按/释放与后台菜单响应已通过；没有扩大到战斗/摇杆性能测试。
+- 按用户“验证快速、通过就开发”的要求，不再排查命令行观察器假阴性。现转入新增手柄输入抽象/OJD 兼容层和只读窗口采集开发。
+- 两分钟探测到期会主动断开，并非设备兼容性失效。为人工检查已把 **仅 neutral** 最大时长延长到 600 秒，其他动作仍最大 10 秒；相关边界测试已更新通过。
+- 日志：`.debug/macos/ojd-neutral.jsonl`、`ojd-gamecontroller-neutral.jsonl`、`ojd-neutral-hid.jsonl`、`hid-gc-match.txt`、`ojd-neutral-user-check.jsonl`、`ojd-neutral-game-restart.jsonl`。避免重复权限安装或盲目启用 USB 扩展。
+
+## 新兼容层按键与模拟室当前位置
+
+- 早期由用户手动切入手柄后，通过新 OJD / MCP 发送方向键下进入“手柄按键”，再用 View 恢复默认、A 确认；实机确认默认普攻 X、闪避 A、特殊 Y、终结 RT，以及 LB / RB 的响应。当前沿用默认手柄 UI，触屏坐标只用于启动前置；已登录会话的自动检测与切换现已通过 GUI 实测，见下节。
+- 已用代码逐步完成：LT＋A 打开手册 → RB 到训练 → 下方向键到模拟室 → A 进入基础材料焦点 → A 确认传送 → A 到模拟室 → Start 下一步，该次导航到出战准备，起始能量 **400**、默认消耗 **100**；队伍为叶瞬光 / 照 / 千夏，均 Lv60。后续战斗结果单列如下，不把导航时状态当作当前资源。
+- `GamepadTransportByCompendium` 配套 4 项测试及实拍 fixture；上述逐步操作只用于画面与焦点证据。之后该传送操作已作为受控单次完整流程的一部分实机执行，结果见下节。
+
+## GUI 已登录会话准备（热切换已通过）
+
+- 用户已确认热切换成功。本次起点为已登录的触屏大世界，在项目 GUI 点击「准备游戏」，由生产 `MacBootstrapGameSession` 和 `MacBootstrapPointer(foreground=True)` 自动执行，没有把 CUA 作为运行依赖。
+- `.debug/macos/dev-app.log` 的 **16:46:05.074—16:46:12.682** 记录：打开触屏菜单 → 打开触屏设置 → 打开输入设置 → 展开 UI 布局 → 选择手柄布局，共五次启动点击；随后 B 返回设置上一级、B 返回大世界，最终返回 **「已截图确认手柄大世界」** 和 **「游戏准备完成」**。该次没有进入战斗。
+- 触屏点击需要临时激活游戏及移动鼠标；纯 `CGEventPostToPid` 在本机没有游戏响应。生产指针显式使用前台路径，并按用户是否主动改动的条件恢复鼠标和原前台应用。手柄界面优先用手柄，已经是手柄大世界时零鼠标输入。
+- 平台画面使用 `ios_gamepad` 独立区域与模板；触屏相机和菜单双模板用于正面识别，不要求先命中 PC 的快捷手册模板。实拍、OCR 快照和相关游戏画面文档已同步。
+- 准备 Operation 的8项聚焦测试、统一入口的9项相关测试及本轮相关 Ruff 已通过；指针前台路径与 GUI 能力的验证分别由对应模块记录，不将各阶段次数简单相加。
+- 用户要求下一步支持游戏未打开时直接冷启动，随后用已保存账号进入大世界。进程启动、登录页、登录奖励和凭据缺失分支尚待现场证据与实现，不把本次热切换写成冷启动通过。
+
+## 本轮战斗与单次验收边界
+
+- 已观察到实战模拟室胜利、S 评价，最后一张结果显示 `00:00:13`；按 B 完成后逐步返回方案页、材料分类和 HIA 大世界，对应画面已归档。
+- 首次调试自动战斗按 5 秒间隔检查结束，结算页残留 X 触发「再来一次」，实际电量 **400→100**，约进行了三场。不能把这次结果写成只消耗 100 电量的单次完整自动通过。
+- 战斗输入范围保护已接入完整 Operation。随后在 **15:43:22—15:44:16** 执行 `tools/macos/run_combat_simulation.py`，从 HIA 大世界自动导航到方案、出战、战斗、结果，再以 B 完成、B 返回分类、B 返回大世界。退出码 **0**，stdout 为 `success:true`、`status:实战模拟室单次挑战完成，已返回大世界`、`completed_battles:1`；日志 `.debug/macos/full-flow.log`。
+- 最终运行期间没有 CUA 动作或人工按键，仅在结束后截图观察确认大世界。输入范围保护实际处理过场暂停 / 恢复，结束时停止普攻 X 并由 B 完整退出；当前桌面默认调查专项的单次自动闭环已通过。
+- 本次使用剩下的 100 电量，结束余量未另开手册复核，不写精确 0。此前误连战 400→100 与本次受控单次分别记录；本次通过不代表自动启动前置、GUI / 体力计划和一条龙入口、更多预设 / 队伍 / 异常分支或整个 Mac 迁移已完成。
+
+## 采集与显示现状
+
+- 当前可缩放模式下的自定义 `1920:1080` 是长宽比，不能据此认定窗口像素或游戏内部渲染尺寸固定为 1920×1080。图像设置未发现禁止拖动缩放的开关；核对的 [PlayTools 窗口代码](https://github.com/PlayCover/PlayTools/blob/fbc88801b63c791e4ef597a2746676c69864ccc6/AKPlugin.swift) 会启用可缩放窗口，并在可缩放模式设置内容比例。保持用户已修复的设置；采集在裁掉已确认标题栏后等比例归一化，正常缩放不需要重新配置窗口尺寸。
+
+- ScreenCaptureKit 此前真实采到原始 **2328×1510** 帧，记录帧龄约 **64ms**。原图不满足 16:9，归一化明确拒绝拉伸；这不是 1080p 识别或战斗通过证据。
+- 尝试 1080p / 16:9 并隐藏标题栏后曾出现竖屏或裁切，用户已自行解决。本轮读取的最终 PlayCover 设置为：Resizable（resolution 6）＋自定义 `1920:1080`、iPad Pro 12.9 M1 / 8GB、scale 2、window fix Normal、标题栏显示；键盘映射和智能映射均开启。只观察，未更改这些设置。
+- 游戏窗口最初为 1572×1048。经 CUA 调整窗口外框后，当前为 **1920×1136**，其中标题栏 **56px**、游戏内容 **1920×1080**；没有改变用户修好的 PlayCover 设置。
+- 已实现显式 `capture_top_inset_pixels` 及账户页整数控件，经控制器传入 `MacWindowCapture.start(top_inset_pixels=...)`。默认 0，不自动猜标题栏；本机已确认使用 **56**。每帧按当前完整宽高裁去顶部后检查 16:9，正常窗口缩放可归一化到 1920×1080，不要求固定窗口尺寸；错误比例仍拒绝拉伸。帧监测使用 `latest_frame()`，将比例检查纳入长按期间的保护。
+- 真实 `ZMacController`（新 OJD 适配器＋SCK）的 `init_before_context_run()` 成功，输出 RGB **[1080, 1920, 3]**、`connected=true`。观测帧龄约 **123ms**，包含保存截图耗时，只作为该次状态记录，不是性能基准；用户随后缩小窗口仍返回 1080p。
+- 早前采集检查中，实机暂停后 `GamepadState` 的按钮、摇杆和扳机全部中立，OJD status 显示连接仍在，清理后控制器关闭。该次因用户正在调整窗口而结束，未发送游戏按键；后续新兼容层按键响应另有证据，均不能替代完整生命周期和战斗验证。
+- 另一次采集 inactive 时窗口 ID 未变、`on_screen=false`，与游戏处在其他桌面有关，不能写成窗口重建。已增加 `ignoreGlobalClipSingleWindow=True`，跨桌面效果未验证。用户已将游戏带回当前桌面，本轮不再扩大跨 Space 检查，相关支持留待后续计划。
+
+## 源码运行与当前执行顺序
+
+在项目根目录运行：
+
+```shell
+PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main
+```
+
+当前桌面的默认调查专项单次脚本已通过，调试入口为 `tools/macos/run_combat_simulation.py`；本轮不再扩大跨 Space 验证。
+
+1. 已登录会话的 GUI 自动准备已通过。继续扩展冷启动：先连接手柄并启动未运行的游戏，再按登录页截图使用手柄进入已保存账号；需要凭据或验证码时明确停止，最后仍须确认手柄大世界。
+2. 原 GUI 和体力计划已接入已验证的手柄组件；继续验证原任务入口、应用层暂停、恢复、停止和异常清理。其他原任务保留列表并灰显，未改造成独立 Mac 任务。
+3. 按证据逐步开放更多预设、队伍、重复策略、资源不足和失败退出分支，补齐相应画面与流程验证。
+4. 跨桌面 / Space 采集、最小化等扩展行为继续列未来计划，不纳入本轮排查。
+
+## 验证与数据保存规则
+
+- 测试仅放独立 `zzz-od-test/test/`，只跑当前改动相关测试和 Ruff。
+- 现场工具输出、临时安装包、原始截图放 `.debug/`、`.install/` 或系统临时目录，不提交用户凭据或游戏账户信息。
+- 画面正式建档遵循 `skills/zzz-od-dev-screen-onboarding/SKILL.md`，归档到测试仓；登录页 OCR 与本次 iOS 战斗、结果、方案、出战、材料分类和 HIA 返回画面已有档案，未覆盖的子态继续按实际证据补充，不伪造 OCR/匹配结果，不手工改 screen_info 代替工具维护。
+- 设备/采集测试区分未执行、失败、通过；模拟测试不作为实机通过证据。
+- 任何后台输入需要保证停止、异常和断连释放。系统虚拟手柄可能被其他手柄应用接收，不能承诺只发给一个游戏。

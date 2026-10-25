@@ -1,0 +1,16 @@
+screen_id: menu
+added_areas:
+- area_name: 手柄-确认弹窗
+  area_type: none
+  pc_rect:
+  - 600
+  - 460
+  - 1300
+  - 760
+- area_name: 手柄-确认按钮
+  area_type: none
+  pc_rect:
+  - 960
+  - 585
+  - 1255
+  - 665

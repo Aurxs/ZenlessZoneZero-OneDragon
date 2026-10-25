@@ -1,0 +1,23 @@
+screen_id: compendium
+added_areas:
+- area_name: 手柄-顶部标签
+  area_type: none
+  pc_rect:
+  - 700
+  - 115
+  - 1645
+  - 205
+- area_name: 手柄-分类列表
+  area_type: none
+  pc_rect:
+  - 160
+  - 300
+  - 440
+  - 925
+- area_name: 手柄-副本列表
+  area_type: none
+  pc_rect:
+  - 470
+  - 245
+  - 1690
+  - 955

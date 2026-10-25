@@ -1,0 +1,20 @@
+screen_id: battle
+added_areas:
+- area_name: 手柄-挑战结果
+  area_type: text
+  pc_rect:
+  - 700
+  - 145
+  - 1210
+  - 300
+  text: 挑战结果
+  lcs_percent: 0.8
+- area_name: 手柄-完成
+  area_type: text
+  pc_rect:
+  - 1660
+  - 995
+  - 1775
+  - 1050
+  text: 完成
+  lcs_percent: 0.8

@@ -1,0 +1,70 @@
+screen_id: combat_simulation
+added_areas:
+- area_name: 手柄-挑战等级
+  area_type: text
+  pc_rect:
+  - 1310
+  - 15
+  - 1495
+  - 88
+  text: 挑战等级
+  lcs_percent: 0.8
+- area_name: 手柄-下一步
+  area_type: text
+  pc_rect:
+  - 1620
+  - 980
+  - 1845
+  - 1055
+  text: 下一步
+  lcs_percent: 0.8
+- area_name: 手柄-预设列表
+  area_type: none
+  pc_rect:
+  - 90
+  - 695
+  - 1820
+  - 890
+- area_name: 手柄-电量
+  area_type: none
+  pc_rect:
+  - 1460
+  - 995
+  - 1610
+  - 1050
+- area_name: 手柄-出战
+  area_type: text
+  pc_rect:
+  - 1690
+  - 995
+  - 1790
+  - 1050
+  text: 出战
+  lcs_percent: 0.8
+- area_name: 手柄-预备编队
+  area_type: text
+  pc_rect:
+  - 410
+  - 995
+  - 550
+  - 1050
+  text: 预备编队
+  lcs_percent: 0.8
+- area_name: 手柄-基础材料分类
+  area_type: text
+  pc_rect:
+  - 410
+  - 595
+  - 535
+  - 650
+  text: 基础材料
+  lcs_percent: 0.8
+- area_name: 手柄-代理人晋升分类
+  area_type: text
+  pc_rect:
+  - 645
+  - 595
+  - 790
+  - 650
+  text: 代理人晋升
+  lcs_percent: 0.8
