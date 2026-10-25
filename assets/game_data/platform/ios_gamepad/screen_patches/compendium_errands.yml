@@ -1,0 +1,23 @@
+screen_id: compendium_errands
+added_areas:
+- area_name: 手柄-领奖提示
+  area_type: none
+  pc_rect:
+  - 700
+  - 970
+  - 1230
+  - 1060
+- area_name: 手柄-周纪入口
+  area_type: none
+  pc_rect:
+  - 350
+  - 375
+  - 800
+  - 920
+- area_name: 手柄-活跃度栏
+  area_type: none
+  pc_rect:
+  - 350
+  - 225
+  - 1675
+  - 350

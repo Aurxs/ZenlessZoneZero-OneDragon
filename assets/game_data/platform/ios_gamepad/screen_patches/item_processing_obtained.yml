@@ -1,0 +1,18 @@
+screen_id: item_processing_obtained
+added_areas:
+- area_name: 手柄-奖励确认
+  area_type: none
+  pc_rect:
+  - 800
+  - 680
+  - 1120
+  - 775
+- area_name: 手柄-奖励选择提示
+  area_type: text
+  pc_rect:
+  - 1000
+  - 785
+  - 1110
+  - 840
+  text: 选择
+  lcs_percent: 0.9

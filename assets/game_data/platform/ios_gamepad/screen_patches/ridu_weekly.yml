@@ -1,0 +1,23 @@
+screen_id: ridu_weekly
+added_areas:
+- area_name: 手柄-页面文字
+  area_type: none
+  pc_rect:
+  - 0
+  - 0
+  - 1920
+  - 1080
+- area_name: 手柄-九宫格
+  area_type: none
+  pc_rect:
+  - 105
+  - 235
+  - 1080
+  - 955
+- area_name: 手柄-底部提示
+  area_type: none
+  pc_rect:
+  - 820
+  - 975
+  - 1310
+  - 1060

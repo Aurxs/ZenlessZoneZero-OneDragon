@@ -1,10 +1,10 @@
+import sys
 from typing import ClassVar
 
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.base.operation.operation_notify import NotifyTiming, node_notify
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
-from one_dragon.utils import cv2_utils, str_utils
 from zzz_od.application.engagement_reward import engagement_reward_const
 from zzz_od.application.zzz_application import ZApplication
 from zzz_od.context.zzz_context import ZContext
@@ -17,6 +17,7 @@ class EngagementRewardApp(ZApplication):
 
     STATUS_NO_REWARD: ClassVar[str] = '无奖励可领取'
     STATUS_CLAIM_SUCCESS: ClassVar[str] = '日常奖励领取成功'
+    STATUS_MACOS: ClassVar[str] = '手柄活跃度奖励'
 
     def __init__(self, ctx: ZContext):
         """
@@ -29,7 +30,22 @@ class EngagementRewardApp(ZApplication):
             op_name=engagement_reward_const.APP_NAME,
         )
 
-    @operation_node(name='返回大世界', is_start_node=True)
+    @operation_node(name='选择输入方式', is_start_node=True)
+    def choose_input_mode(self) -> OperationRoundResult:
+        """Mac 选择手柄分支，其他平台保留原流程。"""
+        return self.round_success(self.STATUS_MACOS if sys.platform == 'darwin' else None)
+
+    @node_from(from_name='选择输入方式', status=STATUS_MACOS)
+    @node_notify(when=NotifyTiming.CURRENT_DONE, detail=True)
+    @operation_node(name='手柄活跃度奖励')
+    def run_gamepad_rewards(self) -> OperationRoundResult:
+        """复用原领奖应用，未知奖励画面由子操作结束并保留。"""
+        from zzz_od.operation.gamepad.rewards import GamepadEngagementReward
+
+        return self.round_by_op_result(GamepadEngagementReward(self.ctx).execute())
+
+    @node_from(from_name='选择输入方式')
+    @operation_node(name='返回大世界')
     def back_at_first(self) -> OperationRoundResult:
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())

@@ -9,6 +9,7 @@ from one_dragon.base.config.one_dragon_config import AfterDoneOpEnum, InstanceRu
 from one_dragon.base.operation.application import application_const
 from zzz_od.application.charge_plan import charge_plan_const
 from zzz_od.application.coffee import coffee_app_const
+from zzz_od.application.engagement_reward import engagement_reward_const
 from zzz_od.application.random_play import random_play_const
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     charge_plan_const.APP_ID,
     random_play_const.APP_ID,
     coffee_app_const.APP_ID,
+    engagement_reward_const.APP_ID,
 })
 
 
@@ -31,7 +33,11 @@ def get_macos_app_unavailable_reason(app_id: str) -> str | None:
     """只限制 Mac 运行，不更改应用注册、顺序与启用状态。"""
     if sys.platform != 'darwin' or app_id in MACOS_SUPPORTED_APP_IDS:
         return None
-    return 'Mac暂未适配，此应用仍可查看和配置'
+    reasons = {
+        'daily_signin': 'Mac 阿朔占卜右摇杆已实现，首次未领取流程待下一次每日机会实测',
+        'ridu_weekly': 'Mac 周纪导航已通过，九宫格可领积分的手柄操作尚待适配',
+    }
+    return reasons.get(app_id, 'Mac暂未适配，此应用仍可查看和配置')
 
 
 def get_macos_one_dragon_unavailable_reason(ctx: ZContext) -> str | None:
