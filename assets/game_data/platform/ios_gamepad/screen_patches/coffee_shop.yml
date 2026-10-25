@@ -1,0 +1,32 @@
+screen_id: coffee_shop
+area_patches:
+  右侧选项区域:
+    pc_rect:
+    - 1340
+    - 490
+    - 1920
+    - 815
+  对话框标题-汀曼大师:
+    pc_rect:
+    - 820
+    - 770
+    - 1100
+    - 860
+    lcs_percent: 0.9
+added_areas:
+- area_name: 手柄-电量奖励
+  area_type: none
+  pc_rect:
+  - 760
+  - 365
+  - 1160
+  - 850
+- area_name: 手柄-今日已喝
+  area_type: text
+  pc_rect:
+  - 515
+  - 865
+  - 1400
+  - 985
+  text: 还请明天再来吧
+  lcs_percent: 0.9

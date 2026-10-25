@@ -118,6 +118,9 @@ class GamepadChooseDialogOption(ZOperation):
             matches.max for text, matches in results.items()
             if self._normalized(text) == 'A' and matches.max is not None
         ]
+        if not prompts:
+            # 小图标在整段 OCR 中偶尔被漏检，用同一实拍 A 图标补充定位。
+            prompts = list(self.ctx.tm.match_template(image, 'ios_gamepad', 'dialog_a', threshold=0.85))
         if not any(prompt.x + prompt.w < current.x and self._same_row(prompt, current) for prompt in prompts):
             return self._fail('目标已高亮但同排 A 提示缺失，未确认')
         if not self._save('选项确认前'):

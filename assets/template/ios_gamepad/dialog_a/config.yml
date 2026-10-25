@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: dialog_a
+template_name: 手柄对话 A 选择
+template_shape: rectangle
+auto_mask: true
+point_list:
+- 1383, 573
+- 1417, 606

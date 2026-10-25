@@ -1,4 +1,5 @@
 import difflib
+import sys
 import time
 from typing import ClassVar
 
@@ -25,6 +26,12 @@ from zzz_od.application.zzz_application import ZApplication
 from zzz_od.context.zzz_context import ZContext
 from zzz_od.game_data.compendium import Coffee
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
+from zzz_od.operation.gamepad.focus import has_filled_highlight
+from zzz_od.operation.gamepad.shop import (
+    fail_shop_state,
+    press_shop_action,
+    save_shop_frame,
+)
 from zzz_od.operation.transport import Transport
 from zzz_od.operation.turning.turn_compensation import AngleTurnCompensator
 from zzz_od.operation.turning.turn_to_angle import turn_to_angle
@@ -37,8 +44,11 @@ class CoffeeApp(ZApplication):
 
     STATUS_EXTRA_COFFEE: ClassVar[str] = '不占用上限的咖啡'
     STATUS_WITHOUT_BENEFIT: ClassVar[str] = '没有增益的咖啡'
+    STATUS_MACOS_EXTRA_COFFEE: ClassVar[str] = 'Mac 额外咖啡已完成'
+    STATUS_MACOS_DIALOG_OPEN: ClassVar[str] = 'Mac 已在咖啡点单对话'
+    STATUS_MACOS_REWARD_OPEN: ClassVar[str] = 'Mac 显式恢复电量奖励'
 
-    def __init__(self, ctx: ZContext):
+    def __init__(self, ctx: ZContext, resume_from_charge_reward: bool = False):
         """
         喝咖啡
         """
@@ -55,6 +65,7 @@ class CoffeeApp(ZApplication):
             group_id=application_const.DEFAULT_GROUP_ID,
         )
         self.chosen_coffee: Coffee | None = None  # 选择的咖啡
+        self.resume_from_charge_reward: bool = resume_from_charge_reward
         self.had_coffee_list: set[str] = set()  # 已经喝过的咖啡
         self.turn_compensator: AngleTurnCompensator = AngleTurnCompensator(self.ctx.controller)
 
@@ -65,19 +76,57 @@ class CoffeeApp(ZApplication):
         """
         self.turn_compensator.reset()
         self.retried_transport: bool = False
+        if sys.platform == 'darwin':
+            # 只保留本次执行已经点过的咖啡，跨日复用应用时重新读取游戏状态。
+            self.chosen_coffee = None
+            self.had_coffee_list.clear()
 
     @node_from(from_name='等待咖啡店加载', success=False)
     @operation_node(name='传送', is_start_node=True)
     def transport(self) -> OperationRoundResult:
+        if sys.platform == 'darwin' and self.resume_from_charge_reward:
+            if self._macos_energy_reward_visible():
+                return self.round_success(self.STATUS_MACOS_REWARD_OPEN)
+            return self.round_fail('显式恢复咖啡奖励时未找到电量弹窗')
         if self.previous_node.name == '等待咖啡店加载':
+            if sys.platform == 'darwin':
+                return fail_shop_state(self, '咖啡店', self.previous_node.status or '进入手柄咖啡店失败')
             if self.retried_transport:
                 return self.round_fail(status='等待咖啡店加载失败，重传送超限')
             self.retried_transport = True
 
+        if sys.platform == 'darwin' and self.last_screenshot is not None and self.round_by_find_area(
+            self.last_screenshot, '咖啡店', '对话框标题-汀曼大师',
+        ).is_success:
+            save_shop_frame(self, '咖啡店', '从当前点单对话恢复')
+            return self.round_success(self.STATUS_MACOS_DIALOG_OPEN)
+
         self.turn_compensator.clear_pending_sample()
         item = get_config_item_from_enum(CoffeeTransportPoint, self.config.transport_point)
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.transport import GamepadTransport
+
+            if self.config.transport_point == CoffeeTransportPoint.POINT_1.value.value:
+                return self.round_fail(f'Mac 尚未支持咖啡店入口的转向移动：{item.value}')
+            return self.round_by_op_result(
+                GamepadTransport(self.ctx, item.area_name, item.tp_name).execute()
+            )
         op = Transport(self.ctx, item.area_name, item.tp_name, wait_at_last=False)
         return self.round_by_op_result(op.execute())
+
+    def _macos_energy_reward_visible(self) -> bool:
+        """获得、电量和黄色确认须同时可见，不确认其他通用奖励。"""
+        area = self.ctx.screen_loader.get_area('咖啡店', '手柄-电量奖励')
+        if area is None or self.last_screenshot is None:
+            return False
+        texts = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+        normalized = {''.join(text.split()): matches for text, matches in texts.items()}
+        if not all(name in normalized for name in ('获得', '电量', '确认')):
+            return False
+        confirm = normalized['确认'].max
+        rect = area.rect
+        image = self.last_screenshot[rect.y1:rect.y2, rect.x1:rect.x2]
+        return confirm is not None and has_filled_highlight(image, confirm.rect, 'yellow')
 
     @node_from(from_name='传送')
     @operation_node(name='等待大世界加载', node_max_retry_times=60)
@@ -101,7 +150,7 @@ class CoffeeApp(ZApplication):
         澄辉坪-汀曼咖啡 / 布亚斯特城区-片刻闲：传送落点已正对入口，直接交互
         :return:
         """
-        if self.config.transport_point == CoffeeTransportPoint.POINT_1.value.value:
+        if sys.platform != 'darwin' and self.config.transport_point == CoffeeTransportPoint.POINT_1.value.value:
             result = turn_to_angle(self, target_angle=180, turn_status='转向正西')
             if not result.is_success:
                 return result
@@ -125,9 +174,13 @@ class CoffeeApp(ZApplication):
         return self.round_retry(status='等待对话框加载', wait=1)  # issue #2301
 
     @node_from(from_name='等待咖啡店加载', status='对话点单')
+    @node_from(from_name='电量确认', status=STATUS_MACOS_EXTRA_COFFEE)
+    @node_from(from_name='传送', status=STATUS_MACOS_DIALOG_OPEN)
     @operation_node(name='对话选咖啡', node_max_retry_times=10)
     def dialog_choose_coffee(self) -> OperationRoundResult:
         """推进对话点单分支，直到出现咖啡选项或回到大世界"""
+        if sys.platform == 'darwin':
+            return self._gamepad_choose_dialog_coffee()
         # 标题会持续到对话结束，消失后按已喝过收尾
         result = self.round_by_find_area(self.last_screenshot, '咖啡店', '对话框标题-汀曼大师')
         if not result.is_success:
@@ -151,11 +204,68 @@ class CoffeeApp(ZApplication):
             return self.round_wait(status='继续对话', wait=1)
         return result
 
+    def _gamepad_choose_dialog_coffee(self) -> OperationRoundResult:
+        """保留候选优先级，由公共手柄对话操作确认当前焦点。"""
+        from zzz_od.operation.gamepad.dialog import GamepadChooseDialogOption
+
+        if self.last_screenshot is None:
+            return self.round_retry('截图无效', wait=1)
+        if self.node_clicked:
+            return fail_shop_state(self, '咖啡店', '点单动作已发送，不重复消耗每日机会')
+        title = self.round_by_find_area(self.last_screenshot, '咖啡店', '对话框标题-汀曼大师')
+        if not title.is_success:
+            # 不把加载空白或未知页面误判成已经喝过。
+            world = self.round_by_find_area(self.last_screenshot, '大世界-普通', '快捷手册')
+            if world.is_success:
+                save_shop_frame(self, '咖啡店', '已喝过_返回大世界')
+                return self.round_success('已喝过', wait=1)
+            save_shop_frame(self, '咖啡店', '未知对话画面')
+            return self.round_retry('等待咖啡对话或大世界', wait=1)
+
+        if self.round_by_find_area(self.last_screenshot, '咖啡店', '手柄-今日已喝').is_success:
+            if save_shop_frame(self, '咖啡店', '今日已喝') is None:
+                return self.round_fail('未能保存已喝咖啡提示')
+            self.ctx.controller.btn_tap('south')
+            return self.round_success('已喝过', wait=1)
+
+        area = self.ctx.screen_loader.get_area('咖啡店', '右侧选项区域')
+        if area is None:
+            return fail_shop_state(self, '咖啡店', '咖啡店对话选项区域未配置')
+        texts = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+        for coffee_name in self._get_coffee_to_choose():
+            target = gt(coffee_name, 'game')
+            options = [text for text in texts if target in text
+                       or str_utils.find_by_lcs(target, text, percent=0.8)]
+            if len(options) != 1:
+                continue
+            if save_shop_frame(self, '咖啡店', f'{coffee_name}_点单前') is None:
+                return self.round_fail('未能保存咖啡点单前画面')
+            self.node_clicked = True
+            # 对话中的完整句子是“请来一杯汀曼特调！”，不能只把咖啡名传给精确选项匹配。
+            result = self.round_by_op_result(GamepadChooseDialogOption(self.ctx, options[0]).execute())
+            self.screenshot()
+            if save_shop_frame(self, '咖啡店', f'{coffee_name}_点单后') is None:
+                return self.round_fail('未能保存咖啡点单后画面')
+            if not result.is_success:
+                return result
+            self.chosen_coffee = self.ctx.compendium_service.name_2_coffee[coffee_name]
+            self.had_coffee_list.add(coffee_name)
+            if self.config.transport_point == CoffeeTransportPoint.POINT_3.value.value:
+                return self.round_success('点单后跳过', wait=1)
+            return self.round_success('已点单', wait=1)
+        result = press_shop_action(self, '咖啡店', '继续对话')
+        if result.is_success:
+            return self.round_retry('继续对话', wait=1)
+        return result
+
     @node_from(from_name='等待大世界加载', status='点单')
     @node_from(from_name='等待咖啡店加载')
     @node_from(from_name='电量确认', status=STATUS_EXTRA_COFFEE)
     @operation_node(name='选择咖啡')
     def choose_coffee(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            candidates = ' / '.join(self._get_coffee_to_choose())
+            return fail_shop_state(self, '咖啡店', f'手柄咖啡列表焦点尚未建档：{candidates}')
         to_choose_list = self._get_coffee_to_choose()
 
         # from one_dragon.utils import debug_utils
@@ -218,6 +328,8 @@ class CoffeeApp(ZApplication):
     @node_from(from_name='选择咖啡')
     @operation_node(name='点单')
     def order_coffee(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return fail_shop_state(self, '咖啡店', '手柄咖啡列表点单尚未建档')
         result = self.round_by_find_and_click_area(self.last_screenshot, '咖啡店', '点单')
         if result.is_success:
             self.had_coffee_list.add(self.chosen_coffee.coffee_name)
@@ -232,6 +344,11 @@ class CoffeeApp(ZApplication):
     @node_from(from_name='点单', status=STATUS_EXTRA_COFFEE)
     @operation_node(name='不占用点单确认')
     def extra_order_confirm(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            for area_name in ('对话框确认', '不可贪杯确认'):
+                if self.round_by_find_area(self.last_screenshot, '咖啡店', area_name).is_success:
+                    return press_shop_action(self, '咖啡店', area_name)
+            return self.round_retry('等待额外咖啡确认', wait=1)
         result = self.round_by_find_and_click_area(self.last_screenshot, '咖啡店', '对话框确认')
         if result.is_success:
             return self.round_success(result.status, wait=1)
@@ -251,6 +368,14 @@ class CoffeeApp(ZApplication):
         if result.is_success:
             return self.round_success(result.status)
 
+        if sys.platform == 'darwin':
+            result = self.round_by_find_area(self.last_screenshot, '咖啡店', '不可贪杯确认')
+            if result.is_success:
+                return press_shop_action(self, '咖啡店', '不可贪杯确认')
+            # 原生手柄无需 PC 的显鼠标拖动；没有跳过键证据时等待动画。
+            save_shop_frame(self, '咖啡店', '等待动画_结果尚未出现')
+            return self.round_retry('等待咖啡动画结束', wait=5)
+
         # 这个点击很怪 需要多点几次
         # 原因是绝区零逆天按钮, 需要先拖鼠标, 让鼠标显形才能点击
         result = self.round_by_find_area(self.last_screenshot, '咖啡店', '点单后跳过')
@@ -268,9 +393,22 @@ class CoffeeApp(ZApplication):
 
     @node_from(from_name='点单后跳过')
     @node_from(from_name='对话选咖啡', status='已点单')
+    @node_from(from_name='传送', status=STATUS_MACOS_REWARD_OPEN)
     @node_notify(when=NotifyTiming.CURRENT_SUCCESS)
     @operation_node(name='电量确认')
     def charge_confirm(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            if self.chosen_coffee is None and not self.resume_from_charge_reward:
+                return fail_shop_state(self, '咖啡店', '电量确认前未记录所选咖啡')
+            if not self._macos_energy_reward_visible():
+                save_shop_frame(self, '咖啡店', '点单后等待确认')
+                return self.round_retry('等待咖啡动画及电量确认，未发送新输入', wait=2)
+            if save_shop_frame(self, '咖啡店', '电量奖励确认前') is None:
+                return self.round_fail('未能保存电量奖励画面')
+            self.ctx.controller.btn_tap('south')
+            if self.chosen_coffee is not None and self.chosen_coffee.extra:
+                return self.round_success(CoffeeApp.STATUS_MACOS_EXTRA_COFFEE, wait=1)
+            return self.round_success(wait=1)
         result = self.round_by_find_and_click_area(self.last_screenshot, '咖啡店', '电量确认')
 
         if result.is_success:
@@ -287,6 +425,12 @@ class CoffeeApp(ZApplication):
     @node_from(from_name='电量确认')
     @operation_node(name='返回大世界')
     def back_to_world(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            result = self.round_by_find_area(self.last_screenshot, '大世界-普通', '快捷手册')
+            if result.is_success:
+                save_shop_frame(self, '咖啡店', '完成_返回大世界')
+                return self.round_success()
+            return self.round_retry('等待咖啡确认后返回大世界', wait=1)
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())
 

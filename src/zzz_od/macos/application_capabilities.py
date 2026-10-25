@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from one_dragon.base.config.one_dragon_config import AfterDoneOpEnum, InstanceRun
 from one_dragon.base.operation.application import application_const
 from zzz_od.application.charge_plan import charge_plan_const
+from zzz_od.application.coffee import coffee_app_const
 from zzz_od.application.random_play import random_play_const
 
 if TYPE_CHECKING:
@@ -22,6 +23,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     application_const.ONE_DRAGON_APP_ID,
     charge_plan_const.APP_ID,
     random_play_const.APP_ID,
+    coffee_app_const.APP_ID,
 })
 
 
