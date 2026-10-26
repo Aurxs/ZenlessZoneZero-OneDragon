@@ -10,7 +10,7 @@
 
 ## 运行一次实战模拟室
 
-当前实例须已选择 Mac 平台并准备好 OCR、闪光模型和 OJD，游戏位于当前桌面且已进入手柄大世界。本入口使用项目的截图、识别、Operation 与自动战斗策略，不依赖 Computer Use。自动切换手柄模式尚待接入。
+当前实例须已选择 Mac 平台并准备好 OCR、闪光模型和 OJD，游戏位于当前桌面且已进入手柄大世界。本入口使用项目的截图、识别、Operation 与自动战斗策略，不依赖 Computer Use。此独立入口不执行输入模式切换；原 GUI / Application 的准备游戏流程已有模式确认与切换。
 
 ```shell
 PYTHONPATH=src uv run --no-sync python tools/macos/run_combat_simulation.py
@@ -18,7 +18,7 @@ PYTHONPATH=src uv run --no-sync python tools/macos/run_combat_simulation.py
 
 默认只运行「基础材料 → 调查专项」一次，沿用当前队伍、默认等级及已选中的五卡预设，核对画面消耗为 100 电量，不足则停止。胜利后按 B 完成，逐步返回大世界。`--prepare-only` 只到出战准备页；`--entry simulation` 从已有的预设或出战页开始。可用 `--auto-battle` 指定已有策略，策略必须关闭尚未校准的自动转向；本机默认使用已配置的 `Mac全配队通用`。
 
-2026-10-25 已完成当前桌面的一次完整实机运行，程序返回 `success: true`、`completed_battles: 1`，并确认回到大世界。战斗输入保护及限制见[手柄实战模拟室设计](../../docs/develop/zzz/application/macos_combat_simulation.md)。跨桌面采集、启动时自动切换输入模式及 GUI 一条龙接入仍按[实施进度](../../docs/develop/zzz/macos_migration_progress.md)推进。
+2026-10-25 已完成当前桌面的一次完整实机运行，程序返回 `success: true`、`completed_battles: 1`，并确认回到大世界。战斗输入保护及限制见[手柄实战模拟室设计](../../docs/develop/zzz/application/macos_combat_simulation.md)。此工具的单次验收不代表新材料已适配；GUI 接入与其他能力的当前状态以[实施进度](../../docs/develop/zzz/macos_migration_progress.md)为准。
 
 ## 只读观察 GameController
 
@@ -83,4 +83,4 @@ python3 tools/macos/gamepad_probe.py --ojd /实际路径/ojd --action combo --bu
 
 本机 Safari 和游戏均已识别 OJD 虚拟手柄；此前原始持久 CLI 的 East 100ms 返回菜单，游戏后台 South 100ms 进入登录奖励页。该结果证明基础输入链路，不代表战斗、持续后台渲染或完整任务通过。命令行 GameController 观察器曾枚举为 0，不能覆盖实际应用的阳性结果，不再为此扩展排查。
 
-项目现已新增 `GamepadInput`、`OjdGamepadClient`、窗口采集和 `ZMacController`，探测脚本仍保持独立。显式顶部裁剪默认 0，本机确认 56px，账户页可配置；每帧按当前宽高裁顶部并检查 16:9，不要求固定窗口尺寸。Mac GUI 源码入口为 `PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main`；须先在账户页显式选择 Mac 平台并准备模型。开发阶段、聚焦测试及真实采集结果以[实施进度](../../docs/develop/zzz/macos_migration_progress.md)为准。
+项目现已新增 `GamepadInput`、`OjdGamepadClient`、窗口采集和 `ZMacController`，探测脚本仍保持独立。显式顶部裁剪默认 0，本机确认 56px，游戏设置页可配置；每帧按当前宽高裁顶部并检查 16:9，不要求固定窗口尺寸。Mac GUI 源码入口为 `PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main`；须先在游戏设置页显式选择 Mac 平台并准备模型。开发阶段、聚焦测试及真实采集结果以[实施进度](../../docs/develop/zzz/macos_migration_progress.md)为准。
