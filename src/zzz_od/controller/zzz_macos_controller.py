@@ -500,6 +500,12 @@ class ZMacController(ControllerBase):
         """根据 Mac 独立校准转向，不沿用 Windows 鼠标速度。"""
         self.move_mouse_relative(d, 0)
 
+    def move_camera(self, x: float, y: float, press_time: float) -> None:
+        """显式右摇杆转向，保留左摇杆状态并沿用新帧与暂停保护。"""
+        if not self._require_input_ready():
+            return
+        self.gamepad.set_stick('right', x, y, press_time=press_time)
+
     def turn_vertical_by_distance(self, d: float) -> None:
         """按独立距离校准控制垂直镜头。"""
         self.move_mouse_relative(0, d)
@@ -514,7 +520,8 @@ class ZMacController(ControllerBase):
             raise ValueError('请先校准 Mac 手柄的 turn_distance_per_second')
         if not self._require_input_ready():
             return
-        self.gamepad.set_stick('right', dx / distance, dy / distance, press_time=distance / speed)
+        amplitude = self.macos_config.turn_stick_amplitude
+        self.gamepad.set_stick('right', dx / distance * amplitude, dy / distance * amplitude, press_time=distance / speed)
 
     def turn_by_angle_diff(self, angle_diff: float) -> None:
         """按 Mac 角速度校准转向，逆时针角度为正。"""

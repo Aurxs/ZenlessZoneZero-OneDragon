@@ -121,6 +121,18 @@ class MacOsConfig(YamlConfig):
         self.update('turn_distance_per_second', value)
 
     @property
+    def turn_stick_amplitude(self) -> float:
+        """返回距离校准配套的右摇杆幅度，旧参数默认满幅。"""
+        return self.get('turn_stick_amplitude', 1.0)
+
+    @turn_stick_amplitude.setter
+    def turn_stick_amplitude(self, value: float) -> None:
+        """保存避开死区且适合短程转向的校准幅度。"""
+        if not 0.3 <= value <= 1.0:
+            raise ValueError('转向摇杆幅度须在0.3至1.0之间')
+        self.update('turn_stick_amplitude', value)
+
+    @property
     def turn_degrees_per_second(self) -> float:
         """返回满幅右摇杆每秒转动角度；零表示尚未校准。"""
         return self.get('turn_degrees_per_second', 0.0)

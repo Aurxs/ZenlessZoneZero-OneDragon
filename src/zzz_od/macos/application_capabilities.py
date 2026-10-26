@@ -35,6 +35,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     'daily_signin',
     'ridu_weekly',
     'notorious_hunt',
+    'mouse_sensitivity_checker',
 })
 
 
@@ -42,6 +43,7 @@ def get_macos_app_limits(app_id: str) -> str:
     """让每个任务显示自身范围，避免商店按钮误显示战斗限制。"""
     return {
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
+        'mouse_sensitivity_checker': 'Mac 在迷失之地入口层用唯一交互图标双向校准右摇杆，保存到当前账户；不修改 Windows 鼠标参数',
         'notorious_hunt': 'Mac 已验证库萨里库免费挑战、GUI 难度与编队、周期领奖；其他 Boss 和深度追猎尚未开放',
         'ridu_weekly': 'Mac 支持领取已完成九宫格积分与积分特赏，不代做周任务',
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,

@@ -1,7 +1,12 @@
+from __future__ import annotations
+
+import sys
 import time
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+from one_dragon.base.operation.application_base import Application
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
@@ -13,6 +18,9 @@ from zzz_od.application.zzz_application import ZApplication
 from zzz_od.context.zzz_context import ZContext
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
 from zzz_od.operation.transport import Transport
+
+if TYPE_CHECKING:
+    from one_dragon.base.operation.operation_base import OperationResult
 
 
 class MouseSensitivityChecker(ZApplication):
@@ -33,14 +41,37 @@ class MouseSensitivityChecker(ZApplication):
         self.last_angle: float = 0
         self.angle_diff_list: list[float] = []
 
+    def execute(self) -> OperationResult:
+        """Mac 在已确认的局内校准，不先将校准目标传送回大世界。"""
+        if sys.platform == 'darwin':
+            return Application.execute(self)
+        return super().execute()
+
     @property
     def _is_gamepad_mode(self) -> bool:
         return self.ctx.controller.background_mode
 
     @operation_node(name='返回大世界')
     def back_at_first(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void_turn import (
+                GamepadLostVoidCalibrateTurn,
+            )
+
+            result = GamepadLostVoidCalibrateTurn(self.ctx, force=True).execute()
+            if not result.success:
+                return self.round_by_op_result(result)
+            return self.round_success('Mac校准已完成', data=result.data)
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())
+
+    @node_from(from_name='返回大世界', status='Mac校准已完成')
+    @operation_node(name='Mac校准结果')
+    def macos_calibration_done(self) -> OperationRoundResult:
+        """参数由校准操作在双向证据通过后写入当前账户。"""
+        return self.round_success('Mac校准已完成', data={
+            'turn_distance_per_second': self.ctx.macos_config.turn_distance_per_second,
+        })
 
     @node_from(from_name='返回大世界')
     @operation_node(name='传送')

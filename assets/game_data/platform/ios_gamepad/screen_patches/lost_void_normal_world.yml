@@ -1,0 +1,9 @@
+screen_id: lost_void_normal_world
+added_areas:
+- area_name: 手柄-战况返回
+  area_type: none
+  pc_rect:
+  - 1250
+  - 990
+  - 1900
+  - 1050
