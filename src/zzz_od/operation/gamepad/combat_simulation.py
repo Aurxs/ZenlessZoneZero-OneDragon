@@ -15,7 +15,7 @@ from zzz_od.operation.gamepad.configure_cards import (
     read_preset_charge,
     survey_preset_focused,
 )
-from zzz_od.operation.zzz_operation import ZOperation
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 
 if TYPE_CHECKING:
     from one_dragon.base.operation.operation_base import OperationResult
@@ -27,11 +27,13 @@ if TYPE_CHECKING:
     from zzz_od.context.zzz_context import ZContext
 
 
-class GamepadCombatSimulation(ZOperation):
+class GamepadCombatSimulation(GamepadOperation):
     """只运行调查专项一张或五张卡片，不变更队伍和电量来源。"""
 
     STATUS_CHARGE_NOT_ENOUGH: ClassVar[str] = '电量不足'
     STATUS_DEPLOYMENT_READY: ClassVar[str] = '出战准备就绪'
+    realtime_nodes: ClassVar[frozenset[str]] = frozenset({'自动战斗'})
+
     STATUS_PREPARED: ClassVar[str] = '准备完成，尚未出战'
 
     def __init__(

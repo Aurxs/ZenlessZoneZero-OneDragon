@@ -10,7 +10,7 @@ from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import debug_utils
 from zzz_od.operation.gamepad.focus import has_filled_highlight, highlight_mask
-from zzz_od.operation.zzz_operation import ZOperation
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 
 if TYPE_CHECKING:
     from cv2.typing import MatLike
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from zzz_od.context.zzz_context import ZContext
 
 
-class _GamepadRewardOperation(ZOperation):
+class _GamepadRewardOperation(GamepadOperation):
     """只在已建档的局部区域读取提示和焦点。"""
 
     def __init__(self, ctx: ZContext, op_name: str, timeout_seconds: float = -1) -> None:

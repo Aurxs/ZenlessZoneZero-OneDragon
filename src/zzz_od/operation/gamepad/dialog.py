@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils.i18_utils import gt
 from zzz_od.operation.gamepad.focus import has_filled_highlight
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.shop import save_shop_frame
-from zzz_od.operation.zzz_operation import ZOperation
 
 if TYPE_CHECKING:
     from one_dragon.base.matcher.match_result import MatchResult
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from zzz_od.context.zzz_context import ZContext
 
 
-class GamepadChooseDialogOption(ZOperation):
+class GamepadChooseDialogOption(GamepadOperation):
     """逐帧移动选项，只报告已经确认的目标，不判断调用方业务完成。"""
 
     def __init__(self, ctx: ZContext, option: str) -> None:

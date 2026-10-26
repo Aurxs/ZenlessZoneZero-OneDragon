@@ -129,3 +129,15 @@ class MacOsConfig(YamlConfig):
     def turn_degrees_per_second(self, value: float) -> None:
         """保存 Mac 专用角度校准。"""
         self.update('turn_degrees_per_second', value)
+
+    @property
+    def menu_action_interval_ms(self) -> int:
+        """返回手柄界面步骤之间的最小等待，单位毫秒。"""
+        return max(0, min(2000, int(self.get('menu_action_interval_ms', 500))))
+
+    @menu_action_interval_ms.setter
+    def menu_action_interval_ms(self, value: int) -> None:
+        """保存界面操作间隔，不改变战斗中的按键节奏。"""
+        if not 0 <= value <= 2000:
+            raise ValueError('界面操作间隔须在 0–2000 毫秒之间')
+        self.update('menu_action_interval_ms', value)

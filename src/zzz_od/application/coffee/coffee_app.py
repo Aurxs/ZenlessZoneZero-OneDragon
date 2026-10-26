@@ -27,6 +27,7 @@ from zzz_od.context.zzz_context import ZContext
 from zzz_od.game_data.compendium import Coffee
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
 from zzz_od.operation.gamepad.focus import has_filled_highlight
+from zzz_od.operation.gamepad.gamepad_operation import GamepadMenuDelayMixin
 from zzz_od.operation.gamepad.shop import (
     fail_shop_state,
     press_shop_action,
@@ -38,7 +39,7 @@ from zzz_od.operation.turning.turn_to_angle import turn_to_angle
 from zzz_od.operation.wait_normal_world import WaitNormalWorld
 
 
-class CoffeeApp(ZApplication):
+class CoffeeApp(GamepadMenuDelayMixin, ZApplication):
 
     """咖啡店:每日免费点单 1 杯咖啡,恢复电量(体力)并获增益 buff。每日 1 次、04:00 重置。"""
 

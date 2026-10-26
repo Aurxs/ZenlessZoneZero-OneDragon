@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
@@ -16,10 +16,10 @@ from zzz_od.operation.gamepad.focus import (
     has_filled_highlight,
     text_inside_frame,
 )
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
-from zzz_od.operation.zzz_operation import ZOperation
 
 if TYPE_CHECKING:
     from one_dragon.base.operation.operation_base import OperationResult
@@ -42,7 +42,7 @@ def validate_macos_hunt_plan(plans: list[ChargePlanItem]) -> str | None:
     return None
 
 
-class GamepadOpenNotoriousHunt(ZOperation):
+class GamepadOpenNotoriousHunt(GamepadOperation):
     """打开恶名狩猎列表，不消耗奖励次数或进入战斗。"""
 
     def __init__(self, ctx: ZContext) -> None:
@@ -86,7 +86,7 @@ class GamepadOpenNotoriousHunt(ZOperation):
         return self.round_retry('等待恶名狩猎分类选中', wait=0.7)
 
 
-class GamepadHuntTransport(ZOperation):
+class GamepadHuntTransport(GamepadOperation):
     """按配置目标导航并传送到恶名狩猎，不进入战斗。"""
 
     def __init__(self, ctx: ZContext, mission_type_name: str) -> None:
@@ -191,12 +191,12 @@ class GamepadHuntTransport(ZOperation):
         return self.round_retry('等待恶名狩猎入口', wait=1)
 
 
-class GamepadHuntPrepare(ZOperation):
+class GamepadHuntPrepare(GamepadOperation):
     """按原计划选择难度与当前编队，准备阶段不开始战斗。"""
 
     def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
         """明确目标和难度，不把未知剩余次数当作免费机会。"""
-        super().__init__(ctx, op_name='手柄恶名狩猎出战准备', timeout_seconds=45)
+        super().__init__(ctx, op_name='手柄恶名狩猎出战准备', timeout_seconds=90)
         self.plan: ChargePlanItem = plan
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(
             ctx, '训练', '恶名狩猎', plan.mission_type_name,
@@ -285,7 +285,7 @@ class GamepadHuntPrepare(ZOperation):
         return self.round_retry('等待明确的等级焦点', wait=0.5)
 
     @node_from(from_name='选择计划难度')
-    @operation_node(name='进入当前编队', node_max_retry_times=8, timeout_seconds=12)
+    @operation_node(name='进入当前编队', node_max_retry_times=8, timeout_seconds=60)
     def prepare_deployment(self) -> OperationRoundResult:
         """确认出战和预备编队出现后结束准备，不发送出战键。"""
         if self.last_screenshot is not None and all(
@@ -317,7 +317,7 @@ class GamepadHuntPrepare(ZOperation):
         return self.round_retry('等待当前编队页面', wait=0.8)
 
 
-class GamepadHuntDeploy(ZOperation):
+class GamepadHuntDeploy(GamepadOperation):
     """已选择编队后进入挑战，保存战前画面，不更新计划次数。"""
 
     def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
@@ -364,7 +364,7 @@ class GamepadHuntDeploy(ZOperation):
         return self.round_retry('等待挑战场景加载', wait=1)
 
 
-class GamepadHuntApproach(ZOperation):
+class GamepadHuntApproach(GamepadOperation):
     """复用上游恶名狩猎战前移动，缺少手柄适配时保留现场。"""
 
     def __init__(self, ctx: ZContext, buff_num: int = 1) -> None:
@@ -407,8 +407,10 @@ class GamepadNotoriousHuntMove(NotoriousHuntMove):
         return super()._move_by_hint()
 
 
-class GamepadHuntBattle(ZOperation):
+class GamepadHuntBattle(GamepadOperation):
     """直接复用原恶名狩猎自动战斗，仅包裹 Mac 输入保护和结束清理。"""
+
+    realtime_nodes: ClassVar[frozenset[str]] = frozenset({'执行原自动战斗'})
 
     def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
         """不重写策略、角色识别和战斗状态判断。"""
@@ -487,7 +489,7 @@ class GamepadHuntBattle(ZOperation):
             self._active = True
 
 
-def read_hunt_result(operation: ZOperation) -> bool | None:
+def read_hunt_result(operation: GamepadOperation) -> bool | None:
     """仅挑战结果标题和通关目标明确时返回成败，未知画面返回 None。"""
     if operation.last_screenshot is None or not operation.round_by_find_area(
         operation.last_screenshot, '战斗画面', '手柄-挑战结果',
@@ -502,7 +504,7 @@ def read_hunt_result(operation: ZOperation) -> bool | None:
     return None if match is None else match[1] == '1'
 
 
-class GamepadHuntResultExit(ZOperation):
+class GamepadHuntResultExit(GamepadOperation):
     """关闭已确认的挑战结算，等返回后再读取免费次数。"""
 
     def __init__(self, ctx: ZContext) -> None:
@@ -540,7 +542,7 @@ class GamepadHuntResultExit(ZOperation):
         return self.round_retry('等待恶名狩猎入口次数', wait=1)
 
 
-class GamepadNotoriousHunt(ZOperation):
+class GamepadNotoriousHunt(GamepadOperation):
     """单场准备、移动、原自动战斗和结算连续执行。"""
 
     def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
@@ -622,12 +624,13 @@ class GamepadNotoriousHunt(ZOperation):
         return self.round_success('恶名狩猎单场完成', data={'left_times': left})
 
 
-class GamepadHuntBackToWorld(ZOperation):
+class GamepadHuntBackToWorld(GamepadOperation):
     """从已确认的恶名狩猎入口返回大世界。"""
 
     def __init__(self, ctx: ZContext) -> None:
         super().__init__(ctx, op_name='手柄恶名狩猎返回街区', timeout_seconds=25)
         self._sent: bool = False
+        self._deployment_back_sent: bool = False
         self._list_back_sent: bool = False
 
     @operation_node(name='返回街区', is_start_node=True, node_max_retry_times=20)
@@ -635,6 +638,14 @@ class GamepadHuntBackToWorld(ZOperation):
         """入口仅返回一次，过渡帧不重复输入。"""
         if self.round_by_find_area(self.last_screenshot, '大世界-普通', '快捷手册').is_success:
             return self.round_success()
+        if not self._deployment_back_sent and all(
+            self.round_by_find_area(self.last_screenshot, '实战模拟室', name).is_success
+            for name in ('手柄-出战', '手柄-预备编队')
+        ):
+            self.ctx.controller.resume_input()
+            self.ctx.controller.btn_tap('east')
+            self._deployment_back_sent = True
+            return self.round_retry('等待离开出战准备', wait=1)
         area = self.ctx.screen_loader.get_area('恶名狩猎', '手柄-页面文字')
         words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
         text = ''.join(words).replace(' ', '')
@@ -650,7 +661,7 @@ class GamepadHuntBackToWorld(ZOperation):
         return self.round_retry('等待返回街区', wait=1)
 
 
-class GamepadHuntOpenRewards(ZOperation):
+class GamepadHuntOpenRewards(GamepadOperation):
     """从挑战入口打开周期奖励，未确认奖励画面前不领取。"""
 
     def __init__(self, ctx: ZContext) -> None:

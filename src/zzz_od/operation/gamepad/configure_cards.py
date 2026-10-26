@@ -11,10 +11,10 @@ from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import debug_utils
 from zzz_od.operation.gamepad.focus import has_filled_highlight, highlight_mask
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
-from zzz_od.operation.zzz_operation import ZOperation
 
 if TYPE_CHECKING:
     from cv2.typing import MatLike
@@ -73,7 +73,7 @@ def survey_preset_focused(ctx: ZContext, screen: MatLike | None) -> bool:
     return False
 
 
-class GamepadConfigureCards(ZOperation):
+class GamepadConfigureCards(GamepadOperation):
     """复用已通过导航，只配置一张或五张调查专项卡片。"""
 
     STATUS_AT_PRESET: ClassVar[str] = '已在模拟室预设'

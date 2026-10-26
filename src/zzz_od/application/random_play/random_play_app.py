@@ -27,6 +27,7 @@ from zzz_od.context.zzz_context import ZContext
 from zzz_od.game_data.agent import Agent, AgentEnum
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
 from zzz_od.operation.gamepad.focus import has_filled_highlight
+from zzz_od.operation.gamepad.gamepad_operation import GamepadMenuDelayMixin
 from zzz_od.operation.gamepad.shop import (
     business_card_titles,
     business_themes_complete,
@@ -43,7 +44,7 @@ from zzz_od.operation.turning.turn_compensation import AngleTurnCompensator
 from zzz_od.operation.turning.turn_to_angle import turn_to_angle
 
 
-class RandomPlayApp(ZApplication):
+class RandomPlayApp(GamepadMenuDelayMixin, ZApplication):
 
     """录像店营业:录像带店日常经营(宣传/营业/结算)。无消耗,产出菲林与丁尼。"""
 

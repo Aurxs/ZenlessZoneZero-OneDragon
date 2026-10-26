@@ -11,7 +11,7 @@ from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from zzz_od.operation.gamepad.focus import has_filled_highlight, highlight_mask
-from zzz_od.operation.zzz_operation import ZOperation
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 
 if TYPE_CHECKING:
     from cv2.typing import MatLike
@@ -43,7 +43,7 @@ def find_yellow_focus_frames(
     return frames
 
 
-class GamepadTransport(ZOperation):
+class GamepadTransport(GamepadOperation):
     """一次只移动一个焦点；未知页、目标不可见或无边框时不猜方向。"""
 
     SUPPORTED_TARGETS: ClassVar[set[tuple[str, str]]] = {

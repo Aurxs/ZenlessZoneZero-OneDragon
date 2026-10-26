@@ -33,6 +33,7 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         self.macos_app_path_opt: TextSettingCard | None = None
         self.macos_launch_timeout_opt: SpinBoxSettingCard | None = None
         self.macos_top_inset_opt: SpinBoxSettingCard | None = None
+        self.macos_menu_interval_opt: SpinBoxSettingCard | None = None
         super().__init__(ctx=ctx, parent=parent)
 
     def _get_instanceSettings_group(self) -> QWidget:
@@ -71,6 +72,11 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         )
         self.macos_top_inset_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_top_inset_opt)
+        self.macos_menu_interval_opt = SpinBoxSettingCard(
+            icon=FluentIcon.HISTORY, title='界面操作间隔（毫秒）', minimum=0, maximum=2000,
+            content='默认 500 毫秒（0.5 秒），每个手柄界面步骤至少等待此时长；不影响战斗策略',
+        )
+        group.addSettingCard(self.macos_menu_interval_opt)
         group.addSettingCard(HelpCard(
             title='Mac 当前支持范围',
             content='准备游戏会按需启动已安装的客户端；凭据或验证码需要人工处理，完整每日流程仍在适配。',
@@ -83,6 +89,9 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         if self.platform_opt is None:
             return
         self.platform_opt.init_with_adapter(self.ctx.game_account_config.get_prop_adapter('platform'))
+        self.macos_menu_interval_opt.init_with_adapter(
+            self.ctx.macos_config.get_prop_adapter('menu_action_interval_ms'),
+        )
         self.macos_bundle_opt.init_with_adapter(self.ctx.macos_config.get_prop_adapter('bundle_id'))
         self.macos_app_path_opt.init_with_adapter(self.ctx.macos_config.get_prop_adapter('app_path'))
         self.macos_launch_timeout_opt.init_with_adapter(

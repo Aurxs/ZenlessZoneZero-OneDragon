@@ -7,26 +7,28 @@ from typing import TYPE_CHECKING
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import debug_utils
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.transport import find_yellow_focus_frames
 from zzz_od.operation.predefined_team_recognizer import recognize_predefined_team
-from zzz_od.operation.zzz_operation import ZOperation
 
 if TYPE_CHECKING:
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.context.zzz_context import ZContext
 
 
-class GamepadOpenPredefinedTeam(ZOperation):
+class GamepadOpenPredefinedTeam(GamepadOperation):
     """打开已有预备编队列表，不创建或修改游戏里的编队。"""
 
     def __init__(self, ctx: ZContext) -> None:
         """选择页由业务操作调用，不能从任意页面盲发 X。"""
         super().__init__(ctx, op_name='手柄打开预备编队', timeout_seconds=20)
-        self._opened: bool = False
+        self._open_attempts: int = 0
+        self._ready_frames: int = 0
 
     def handle_init(self) -> None:
         """新运行清除打开标记。"""
-        self._opened = False
+        self._open_attempts = 0
+        self._ready_frames = 0
 
     @operation_node(name='打开预备编队', is_start_node=True, node_max_retry_times=8)
     def open_teams(self) -> OperationRoundResult:
@@ -36,12 +38,14 @@ class GamepadOpenPredefinedTeam(ZOperation):
         words = self.ctx.ocr.run_ocr(self.last_screenshot)
         if any('预备出战' in text for text in words):
             return self.round_success()
-        if not self._opened and all(
+        if all(
             self.round_by_find_area(self.last_screenshot, '实战模拟室', name).is_success
             for name in ('手柄-出战', '手柄-预备编队')
         ):
-            self.ctx.controller.btn_tap('west')
-            self._opened = True
+            self._ready_frames += 1
+            if self._ready_frames % 2 == 1 and self._open_attempts < 3:
+                self.ctx.controller.btn_tap('west')
+                self._open_attempts += 1
             return self.round_retry('等待预备编队列表', wait=1)
         if self.node_retry_times >= 3:
             self.save_screenshot(prefix='macos_teams_open_pending')
@@ -57,7 +61,7 @@ class GamepadOpenPredefinedTeam(ZOperation):
         })
 
 
-class GamepadChoosePredefinedTeam(ZOperation):
+class GamepadChoosePredefinedTeam(GamepadOperation):
     """用原编队序号和成员核对第一屏六队，完成后回到出战准备。"""
 
     def __init__(self, ctx: ZContext, target_team_idx: int) -> None:

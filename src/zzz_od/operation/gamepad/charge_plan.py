@@ -12,10 +12,10 @@ from zzz_od.application.charge_plan.charge_plan_config import (
 )
 from zzz_od.operation.gamepad.combat_simulation import GamepadCombatSimulation
 from zzz_od.operation.gamepad.configure_cards import GamepadConfigureCards
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
-from zzz_od.operation.zzz_operation import ZOperation
 
 if TYPE_CHECKING:
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
@@ -67,7 +67,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
     return None
 
 
-class GamepadChargePlan(ZOperation):
+class GamepadChargePlan(GamepadOperation):
     """每场配置后核对实际二十或一百电量，胜利次数沿用原配置保存。"""
 
     STATUS_FINISHED: ClassVar[str] = '体力计划结束'

@@ -11,7 +11,7 @@ from zzz_od.operation.gamepad.focus import (
     has_filled_highlight,
     text_inside_frame,
 )
-from zzz_od.operation.zzz_operation import ZOperation
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 
 if TYPE_CHECKING:
     from cv2.typing import MatLike
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from zzz_od.context.zzz_context import ZContext
 
 
-class GamepadTransportByCompendium(ZOperation):
+class GamepadTransportByCompendium(GamepadOperation):
     """逐帧确认焦点后导航，不使用坐标点击或桌面输入。"""
 
     TABS: tuple[str, ...] = ('目标', '日常', '训练', '作战', '战术')

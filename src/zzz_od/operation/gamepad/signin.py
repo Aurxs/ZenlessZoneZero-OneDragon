@@ -9,7 +9,7 @@ from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import debug_utils
 from zzz_od.operation.gamepad.focus import has_filled_highlight
-from zzz_od.operation.zzz_operation import ZOperation
+from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 
 if TYPE_CHECKING:
     from one_dragon.base.operation.operation_base import OperationResult
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from zzz_od.context.zzz_context import ZContext
 
 
-class GamepadDailySignIn(ZOperation):
+class GamepadDailySignIn(GamepadOperation):
     """只运行用户选择的卦象集录，不额外消耗其他签到次数。"""
 
     STATUS_AT_TRIGRAMS: ClassVar[str] = '已在卦象界面'
