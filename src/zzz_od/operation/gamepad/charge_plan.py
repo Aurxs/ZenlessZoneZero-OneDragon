@@ -13,7 +13,10 @@ from zzz_od.application.charge_plan.charge_plan_config import (
 from zzz_od.operation.gamepad.combat_simulation import GamepadCombatSimulation
 from zzz_od.operation.gamepad.configure_cards import GamepadConfigureCards
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
-from zzz_od.operation.gamepad.simulation_preset import BASIC_MISSIONS
+from zzz_od.operation.gamepad.simulation_preset import (
+    SIMULATION_TYPES,
+    simulation_targets,
+)
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
@@ -39,10 +42,9 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
     supported: dict[str, tuple[str | int, ...]] = {
         'tab_name': ('训练',),
         'category_name': ('实战模拟室',),
-        'mission_type_name': ('基础材料',),
-        'mission_name': BASIC_MISSIONS,
+        'mission_type_name': SIMULATION_TYPES,
         'level': ('默认等级',),
-        'card_num': (CardNumEnum.DEFAULT.value.value, '1', '5'),
+        'card_num': (CardNumEnum.DEFAULT.value.value, '1', '2', '3', '4', '5'),
         'predefined_team_idx': tuple(range(-1, 6)),
     }
     labels: dict[str, str] = {
@@ -60,16 +62,18 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
             if value not in values:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
-                    '目前仅支持训练/实战模拟室/基础材料四专项、默认等级、'
-                    '默认五卡、1张或5张卡片、当前编队或前六个预备编队'
+                    '目前仅支持训练/实战模拟室/基础/晋升/音擎改装/技能材料、默认等级、'
+                    '默认五卡、1至5张卡片、当前编队或前六个预备编队'
                 )
+        if plan.mission_name not in simulation_targets().get(plan.mission_type_name, ()):
+            return f'Mac 体力计划第 {index} 项的专项“{plan.mission_type_name}/{plan.mission_name}”不在原副本数据中'
         if plan.plan_times <= 0 or plan.run_times < 0:
             return f'Mac 体力计划第 {index} 项的计划次数必须大于零，已运行次数不能为负'
     return None
 
 
 class GamepadChargePlan(GamepadOperation):
-    """每场配置后核对实际二十或一百电量，胜利次数沿用原配置保存。"""
+    """每场配置后核对实际所需电量，胜利次数沿用原配置保存。"""
 
     STATUS_FINISHED: ClassVar[str] = '体力计划结束'
     STATUS_TRY_NEXT_PLAN: ClassVar[str] = '继续后续可执行计划'
@@ -145,14 +149,14 @@ class GamepadChargePlan(GamepadOperation):
     @node_from(from_name='选择原体力计划')
     @operation_node(name='手柄传送至模拟室')
     def transport(self) -> OperationRoundResult:
-        """每场完成后从大世界重新导航，沿用已验证的单次路径。"""
+        """共用已验证的基础材料入口，随后按计划切换实际分类和专项。"""
         if self.current_plan is None:
             return self.round_fail('尚未选择体力计划')
         if self._found('手柄-挑战等级') and self._found('手柄-下一步'):
             return self.round_success('已在模拟室预设，继续核对卡片与电量')
         op = GamepadTransportByCompendium(
             self.ctx, self.current_plan.tab_name,
-            self.current_plan.category_name, self.current_plan.mission_type_name,
+            self.current_plan.category_name, '基础材料',
         )
         return self.round_by_op_result(op.execute())
 
@@ -163,7 +167,7 @@ class GamepadChargePlan(GamepadOperation):
         if self._simulation is None or self.current_plan is None:
             return self.round_fail('尚未创建单次挑战')
         return self.round_by_op_result(
-            GamepadConfigureCards(self.ctx, self._simulation.expected_card_count, self.current_plan.mission_name).execute()
+            GamepadConfigureCards(self.ctx, self._simulation.expected_card_count, self.current_plan.mission_name, self.current_plan.mission_type_name).execute()
         )
 
     @node_from(from_name='配置本次卡片数量')
@@ -222,7 +226,7 @@ class GamepadChargePlan(GamepadOperation):
             if self.config.skip_plan and self.current_plan is not None and self.current_charge is not None:
                 following = self.config.get_next_plan(self.current_plan)
                 while following is not None:
-                    required = 20 if following.card_num == '1' else 100
+                    required = 100 if following.card_num == CardNumEnum.DEFAULT.value.value else int(following.card_num) * 20
                     if self.current_charge >= required:
                         self.current_plan.skipped = True
                         return self.round_success(self.STATUS_TRY_NEXT_PLAN)

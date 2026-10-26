@@ -15,9 +15,10 @@ from zzz_od.operation.gamepad.configure_cards import (
 )
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.simulation_preset import (
-    BASIC_MISSIONS,
+    SIMULATION_TYPES,
     preset_focused,
     read_preset_charge,
+    simulation_targets,
 )
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 
 
 class GamepadCombatSimulation(GamepadOperation):
-    """按基础材料计划运行一次，复用编队、策略和胜利记录。"""
+    """按模拟室材料计划运行一次，复用编队、策略和胜利记录。"""
 
     STATUS_CHARGE_NOT_ENOUGH: ClassVar[str] = '电量不足'
     STATUS_DEPLOYMENT_READY: ClassVar[str] = '出战准备就绪'
@@ -128,7 +129,7 @@ class GamepadCombatSimulation(GamepadOperation):
     @property
     def expected_card_count(self) -> int:
         """默认沿用五张目标，已保存的一张预设不能冒充默认五张。"""
-        return 1 if self.plan.card_num == '1' else 5
+        return 5 if self.plan.card_num == CardNumEnum.DEFAULT.value.value else int(self.plan.card_num)
 
     @property
     def expected_charge(self) -> int:
@@ -141,13 +142,13 @@ class GamepadCombatSimulation(GamepadOperation):
         if (
             self.plan.tab_name != '训练'
             or self.plan.category_name != '实战模拟室'
-            or self.plan.mission_type_name != '基础材料'
-            or self.plan.mission_name not in BASIC_MISSIONS
+            or self.plan.mission_type_name not in SIMULATION_TYPES
+            or self.plan.mission_name not in simulation_targets().get(self.plan.mission_type_name, ())
             or self.plan.level != '默认等级'
-            or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '1', '5')
+            or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '1', '2', '3', '4', '5')
             or self.plan.predefined_team_idx not in range(-1, 6)
         ):
-            return self.round_fail('手柄实战模拟室暂支持基础材料四专项1张或5张卡片、默认等级与当前编队或前六个预备编队')
+            return self.round_fail('手柄实战模拟室支持基础、晋升、音擎改装、技能材料1至5张卡片、默认等级与当前编队或前六个预备编队')
         if self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('当前计划已完成')
         return self.round_success()
@@ -188,7 +189,7 @@ class GamepadCombatSimulation(GamepadOperation):
             if charge is not None and charge[1] == self.expected_charge:
                 return self.round_success('目标专项与卡片已确认')
         return self.round_by_op_result(
-            GamepadConfigureCards(self.ctx, self.expected_card_count, self.plan.mission_name).execute()
+            GamepadConfigureCards(self.ctx, self.expected_card_count, self.plan.mission_name, self.plan.mission_type_name).execute()
         )
 
     @node_from(from_name='配置挑战卡片')

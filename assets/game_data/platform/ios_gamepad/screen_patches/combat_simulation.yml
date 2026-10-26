@@ -89,3 +89,10 @@ added_areas:
   - 680
   - 1820
   - 980
+- area_name: 手柄-材料分类列表
+  area_type: none
+  pc_rect:
+  - 340
+  - 220
+  - 1570
+  - 880
