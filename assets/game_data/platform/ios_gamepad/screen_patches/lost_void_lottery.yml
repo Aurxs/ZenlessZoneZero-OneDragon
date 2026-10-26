@@ -1,0 +1,9 @@
+screen_id: lost_void_lottery
+added_areas:
+- area_name: 手柄-开始提示
+  area_type: none
+  pc_rect:
+  - 760
+  - 880
+  - 1165
+  - 1010

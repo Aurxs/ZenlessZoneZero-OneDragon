@@ -411,6 +411,7 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
                         '迷失之地-挑战结果',
                         '迷失之地-战斗失败',
                         '迷失之地-邦布商店',
+                        '迷失之地-抽奖机',
                     ],
                 )
                 if (

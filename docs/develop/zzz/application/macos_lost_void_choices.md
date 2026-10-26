@@ -11,3 +11,5 @@
 实拍归档在测试仓 `screens/迷失之地-通用选择/`：`ios_single_initial.webp`、`ios_multi_empty.webp`、`ios_multi_full.webp`、`ios_multi_same_style.webp`、`ios_two_gears.webp`。覆盖单选移焦、仅确认一次、多选候选完整性、计数无变化保护、同流派标记覆盖与双武备 A 提示检查；目前已分段实机通过。此组件通过不代表整局、8000悬赏或原GUI独立验收通过。
 
 卡牌获得提示代表图为 `screens/迷失之地-通用选择/ios_gain_card_a.webp`。真实提示的 A 在 OCR 中漏检、模板匹配 0.84，生产 Operation 已确认后返回大世界；回归同时覆盖 A 缺失及出现在其他行的负例。
+
+抽奖机奖励确认后可返回抽奖机，由其原次数判断决定是否返回大世界；通用选择不继续向抽奖按钮发送 A。
