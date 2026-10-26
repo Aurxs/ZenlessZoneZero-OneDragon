@@ -1,0 +1,17 @@
+screen_id: lost_void_gear
+area_patches:
+  文本-详情:
+    lcs_percent: 0.7
+    pc_rect:
+    - 220
+    - 25
+    - 295
+    - 85
+added_areas:
+- area_name: 手柄-初始武备确认
+  area_type: none
+  pc_rect:
+  - 550
+  - 420
+  - 1370
+  - 780
