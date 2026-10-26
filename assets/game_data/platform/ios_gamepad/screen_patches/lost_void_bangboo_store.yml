@@ -1,0 +1,30 @@
+screen_id: lost_void_bangboo_store
+added_areas:
+- area_name: 手柄-商店余额
+  area_type: none
+  pc_rect:
+  - 1630
+  - 15
+  - 1870
+  - 95
+- area_name: 手柄-商店刷新
+  area_type: none
+  pc_rect:
+  - 1450
+  - 985
+  - 1880
+  - 1075
+- area_name: 手柄-购买正文
+  area_type: none
+  pc_rect:
+  - 480
+  - 300
+  - 1450
+  - 650
+- area_name: 手柄-商店确认提示
+  area_type: none
+  pc_rect:
+  - 880
+  - 680
+  - 1040
+  - 740
