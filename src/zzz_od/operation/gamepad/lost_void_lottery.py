@@ -17,14 +17,17 @@ if TYPE_CHECKING:
 
 
 class GamepadLostVoidLottery(_GamepadRewardOperation):
-    """只操作明确的 1/1 次数，不将分母或其他数字当成剩余机会。"""
+    """按实际剩余次数逐次处理，不将分母或其他数字当成剩余机会。"""
 
     def __init__(self, ctx: ZContext) -> None:
-        super().__init__(ctx, op_name='手柄迷失之地抽奖机', timeout_seconds=120)
+        super().__init__(ctx, op_name='手柄迷失之地抽奖机', timeout_seconds=240)
         self._started: bool = False
         self._started_at: float = 0
         self._back_sent: bool = False
         self._reward_confirmed: bool = False
+        self._pending_remaining: int | None = None
+        self._total: int | None = None
+        self._action_frame_time: float = -1
 
     @operation_node(name='使用剩余次数并返回', is_start_node=True, node_max_retry_times=25)
     def use_remaining(self) -> OperationRoundResult:
@@ -53,19 +56,32 @@ class GamepadLostVoidLottery(_GamepadRewardOperation):
         if footer is None:
             return self.round_retry('等待抽奖机剩余次数', wait=1)
         image, words = footer
-        counts = [(re.fullmatch(r'开始([01])/1', ''.join(text.split())), matches.max) for text, matches in words.items()]
+        counts = [(re.fullmatch(r'开始(\d+)/(\d+)', ''.join(text.split())), matches.max) for text, matches in words.items()]
         counts = [(match, position) for match, position in counts if match is not None and position is not None]
+        if not counts and not words:
+            return self.round_retry('等待开始按钮与完整剩余次数', wait=1)
         if len(counts) != 1:
             return self.round_fail('抽奖机次数或按钮不明确，未发送输入')
         count, position = counts[0]
-        if count.group(1) == '0':
-            self.ctx.controller.btn_tap('east')
-            self._back_sent = True
-            return self.round_retry('抽奖机次数已用完，等待返回', wait=1)
-        if self._started:
+        remaining, total = int(count.group(1)), int(count.group(2))
+        if total <= 0 or remaining > total or self._total is not None and total != self._total:
+            return self.round_fail('抽奖机剩余或总次数不可信，未发送输入')
+        self._total = total
+        if self._pending_remaining is not None:
+            if remaining == self._pending_remaining - 1:
+                self._pending_remaining = None
+                return self.round_retry('抽奖机实际次数已减少，等待下一帧', wait=1)
+            if remaining != self._pending_remaining:
+                return self.round_fail('抽奖机次数变化不符，已停止')
             if time.monotonic() - self._started_at > 8:
                 return self.round_fail('抽奖机开始后次数未变化，不重复确认')
             return self.round_retry('等待抽奖机次数变化', wait=1)
+        if remaining == 0:
+            self.ctx.controller.btn_tap('east')
+            self._back_sent = True
+            return self.round_retry('抽奖机次数已用完，等待返回', wait=1)
+        if self.last_screenshot_time <= self._action_frame_time:
+            return self.round_retry('等待抽奖机开始后的新帧', wait=1)
         prompts = [matches.max for text, matches in words.items() if text.strip().upper() == 'A' and matches.max is not None]
         if not prompts:
             prompts = list(self.ctx.tm.match_template(image, 'ios_gamepad', 'dialog_a', threshold=0.8))
@@ -76,4 +92,7 @@ class GamepadLostVoidLottery(_GamepadRewardOperation):
         self.ctx.controller.btn_tap('south')
         self._started = True
         self._started_at = time.monotonic()
+        self._pending_remaining = remaining
+        self._action_frame_time = self.last_screenshot_time
+        self._reward_confirmed = False
         return self.round_retry('等待抽奖机动画', wait=4)
