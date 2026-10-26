@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_buff_checked
+template_name: 迷失之地已选择周期增益
+template_shape: circle
+auto_mask: true
+point_list:
+- 1770, 454
+- 1791, 454

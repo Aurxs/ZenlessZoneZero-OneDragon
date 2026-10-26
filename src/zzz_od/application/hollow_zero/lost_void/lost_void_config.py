@@ -65,3 +65,15 @@ class LostVoidConfig(ApplicationConfig):
     @challenge_config.setter
     def challenge_config(self, new_value: str):
         self.update('challenge_config', new_value)
+
+    @property
+    def ether_activity(self) -> int:
+        """Mac 战线肃清以太活性，-1 保留游戏中的设置。"""
+        return self.get('ether_activity', -1)
+
+    @ether_activity.setter
+    def ether_activity(self, value: int) -> None:
+        """配置仅保存有效档位，实际运行还须核对游戏显示的上限。"""
+        if type(value) is not int or not -1 <= value <= 12:
+            raise ValueError('以太活性必须为维持游戏设置或0至12')
+        self.update('ether_activity', value)

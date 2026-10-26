@@ -1,0 +1,56 @@
+screen_id: lost_void_entry_purge
+area_patches:
+  按钮-街区:
+    id_mark: null
+    goto_list: null
+  菜单-返回:
+    id_mark: null
+    goto_list: null
+added_areas:
+- area_name: 手柄-调查战略
+  area_type: text
+  id_mark: true
+  pc_rect:
+  - 1680
+  - 190
+  - 1820
+  - 340
+  text: 调查战略
+  lcs_percent: 0.9
+- area_name: 手柄-以太活性
+  area_type: none
+  pc_rect:
+  - 950
+  - 330
+  - 1850
+  - 930
+- area_name: 手柄-活性数值
+  area_type: none
+  pc_rect:
+  - 990
+  - 830
+  - 1330
+  - 890
+- area_name: 手柄-活性选项
+  area_type: none
+  pc_rect:
+  - 970
+  - 340
+  - 1835
+  - 810
+- area_name: 手柄-周期增益选项
+  area_type: none
+  pc_rect:
+  - 985
+  - 380
+  - 1810
+  - 810
+- area_name: 手柄-下一步
+  area_type: text
+  pc_rect:
+  - 1650
+  - 990
+  - 1825
+  - 1060
+  text: 下一步
+  lcs_percent: 0.65

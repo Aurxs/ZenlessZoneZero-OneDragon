@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
@@ -72,6 +73,18 @@ class LostVoidSettingInterface(VerticalScrollInterface, GroupIdMixin):
             content='选择副本',
         )
         left_layout.addWidget(self.mission_opt)
+        self.mission_opt.value_changed.connect(self._update_activity_visibility)
+
+        self.ether_activity_opt = ComboBoxSettingCard(
+            icon=FluentIcon.GAME,
+            title='以太活性（Mac）',
+            content='战线肃清：保留游戏设置或指定活性，出战前核对实际值',
+            options_list=[ConfigItem('维持游戏设置', -1), *[
+                ConfigItem(f'{value} 活性', value) for value in range(13)
+            ]],
+        )
+        self.ether_activity_opt.setVisible(sys.platform == 'darwin')
+        left_layout.addWidget(self.ether_activity_opt)
 
         self.task_type_opt = ComboBoxSettingCard(
             icon=FluentIcon.CALENDAR,  # 选择与时间相关的图标
@@ -143,11 +156,20 @@ class LostVoidSettingInterface(VerticalScrollInterface, GroupIdMixin):
         self.challenge_config_opt.init_with_adapter(get_prop_adapter(self.config, 'challenge_config'))
 
         self.mission_opt.init_with_adapter(get_prop_adapter(self.config, 'mission_name'))
+        self.ether_activity_opt.init_with_adapter(get_prop_adapter(self.config, 'ether_activity'))
+        self._update_activity_visibility()
         self._update_run_record_display()
 
         self.daily_plan_times_opt.init_with_adapter(get_prop_adapter(self.config, 'daily_plan_times'))
         self.task_type_opt.init_with_adapter(get_prop_adapter(self.config, 'extra_task'))
         self.weekly_plan_times_opt.init_with_adapter(get_prop_adapter(self.config, 'weekly_plan_times'))
+
+    def _update_activity_visibility(self) -> None:
+        """活性选择仅在已实现对应流程的平台与副本显示。"""
+        if hasattr(self, 'ether_activity_opt'):
+            self.ether_activity_opt.setVisible(
+                sys.platform == 'darwin' and self.mission_opt.getValue() == '战线肃清',
+            )
 
     def _update_run_record_display(self) -> None:
         if self.run_record.bounty_commission_complete:
