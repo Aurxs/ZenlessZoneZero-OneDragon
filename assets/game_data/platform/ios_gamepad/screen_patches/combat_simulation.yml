@@ -85,7 +85,7 @@ added_areas:
 - area_name: 手柄-预设操作菜单
   area_type: none
   pc_rect:
-  - 425
+  - 90
   - 680
-  - 725
-  - 975
+  - 1820
+  - 980

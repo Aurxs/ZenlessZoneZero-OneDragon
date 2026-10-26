@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: bootstrap_world_lt
+template_name: 大世界手柄LT提示
+template_shape: rectangle
+auto_mask: true
+point_list:
+- 1808, 114
+- 1843, 144

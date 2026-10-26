@@ -1,4 +1,4 @@
-"""只配置调查专项卡片数量，不进入编队、不出战也不恢复电量。"""
+"""配置指定基础材料专项的卡片数量，不进入编队、不出战也不恢复电量。"""
 
 from __future__ import annotations
 
@@ -12,76 +12,32 @@ from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import debug_utils
 from zzz_od.operation.gamepad.focus import has_filled_highlight, highlight_mask
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
+from zzz_od.operation.gamepad.simulation_preset import (
+    BASIC_MISSIONS,
+    GamepadChooseSimulationPreset,
+    preset_focused,
+    read_preset_area,
+    read_preset_charge,
+)
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
 
 if TYPE_CHECKING:
-    from cv2.typing import MatLike
-
-    from one_dragon.base.matcher.match_result import MatchResultList
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.context.zzz_context import ZContext
 
 
-def read_preset_area(
-    ctx: ZContext, screen: MatLike | None, area_name: str,
-) -> tuple[MatLike, dict[str, MatchResultList]] | None:
-    """读取平台模拟室区域，缺少截图或配置时不产生输入。"""
-    area = ctx.screen_loader.get_area('实战模拟室', area_name)
-    if area is None or screen is None:
-        return None
-    rect = area.rect
-    image = screen[rect.y1:rect.y2, rect.x1:rect.x2]
-    if not image.size:
-        return None
-    return image, ctx.ocr.crop_and_run_ocr(screen, rect)
-
-
-def read_preset_charge(ctx: ZContext, screen: MatLike | None) -> tuple[int, int] | None:
-    """读取实际电量与所需消耗，不用卡片预估代替画面。"""
-    area = read_preset_area(ctx, screen, '手柄-电量')
-    if area is None:
-        return None
-    values: set[tuple[int, int]] = set()
-    for text in area[1]:
-        match = re.fullmatch(r'\s*(\d{1,4})\s*/\s*(\d{1,3})\s*', text)
-        if match is not None:
-            values.add((int(match[1]), int(match[2])))
-    return next(iter(values)) if len(values) == 1 else None
-
-
-def survey_preset_focused(ctx: ZContext, screen: MatLike | None) -> bool:
-    """调查专项文字须被完整黄色卡片边框包住。"""
-    area = read_preset_area(ctx, screen, '手柄-预设列表')
-    if area is None:
-        return False
-    image, results = area
-    target = next((matches.max for text, matches in results.items()
-                   if '调查专项' in text and matches.max is not None), None)
-    if target is None:
-        return False
-    contours, _ = cv2.findContours(
-        highlight_mask(image, 'yellow'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE,
-    )
-    for contour in contours:
-        x, y, width, height = cv2.boundingRect(contour)
-        if width < 200 or height < 100 or cv2.contourArea(contour) / (width * height) < 0.75:
-            continue
-        if x < target.x < target.x + target.w < x + width and y < target.y < target.y + target.h < y + height:
-            return True
-    return False
-
-
 class GamepadConfigureCards(GamepadOperation):
-    """复用已通过导航，只配置一张或五张调查专项卡片。"""
+    """复用已通过导航，配置一张或五张目标专项卡片。"""
 
     STATUS_AT_PRESET: ClassVar[str] = '已在模拟室预设'
 
-    def __init__(self, ctx: ZContext, num_cards: int) -> None:
+    def __init__(self, ctx: ZContext, num_cards: int, mission_name: str = '调查专项') -> None:
         """保留明确目标数量，不自动把一张计划当作五张。"""
-        super().__init__(ctx, op_name=f'手柄配置调查专项 {num_cards} 张卡片', timeout_seconds=90)
+        super().__init__(ctx, op_name=f'手柄配置{mission_name} {num_cards} 张卡片', timeout_seconds=90)
         self.num_cards: int = num_cards
+        self.mission_name: str = mission_name
         self._edit_sent: bool = False
         self._menu_confirm_sent: bool = False
         self._last_menu_focus: str | None = None
@@ -166,9 +122,11 @@ class GamepadConfigureCards(GamepadOperation):
     @operation_node(name='核对卡片目标和起点', is_start_node=True)
     def check_entry(self) -> OperationRoundResult:
         """只支持一张和五张，从预设或已确认大世界进入。"""
+        if self.mission_name not in BASIC_MISSIONS:
+            return self.round_fail(f'尚未支持专项：{self.mission_name}')
         if self.num_cards not in (1, 5):
             return self.round_fail('Mac 卡片配置目前仅支持1张或5张')
-        if self._preset_visible() or self._editor_charge() is not None:
+        if self._preset_visible():
             return self.round_success(self.STATUS_AT_PRESET)
         if self.last_screenshot is not None and self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册',
@@ -187,7 +145,15 @@ class GamepadConfigureCards(GamepadOperation):
 
     @node_from(from_name='核对卡片目标和起点', status=STATUS_AT_PRESET)
     @node_from(from_name='传送至卡片预设')
-    @operation_node(name='配置调查专项卡片', node_max_retry_times=20, timeout_seconds=30)
+    @operation_node(name='选择计划专项', screenshot_before_round=False)
+    def choose_preset(self) -> OperationRoundResult:
+        """先完成专项选择，编辑页面只能由本次目标打开。"""
+        return self.round_by_op_result(GamepadChooseSimulationPreset(
+            self.ctx, self.mission_name,
+        ).execute())
+
+    @node_from(from_name='选择计划专项')
+    @operation_node(name='配置专项卡片', node_max_retry_times=20, timeout_seconds=45)
     def configure(self) -> OperationRoundResult:
         """预设 A 只打开菜单，只有编辑项已高亮才再 A，不触发开始战斗。"""
         editor = self._editor_charge()
@@ -236,8 +202,8 @@ class GamepadConfigureCards(GamepadOperation):
                 self._last_menu_focus = selected
             return self.round_retry('等待编辑项黄色焦点，未发送确认', wait=0.8)
         if self._preset_visible():
-            if not survey_preset_focused(self.ctx, self.last_screenshot):
-                return self.round_fail('当前未选中调查专项，未进入卡片编辑')
+            if not preset_focused(self.ctx, self.last_screenshot, self.mission_name):
+                return self.round_fail(f'当前未选中{self.mission_name}，未进入卡片编辑')
             charge = read_preset_charge(self.ctx, self.last_screenshot)
             if charge is None:
                 return self.round_retry('等待实际电量消耗', wait=0.8)
@@ -257,7 +223,7 @@ class GamepadConfigureCards(GamepadOperation):
                 self._save('before_edit')
                 self.ctx.controller.btn_tap('south')
                 self._edit_sent = True
-            return self.round_retry('等待调查专项卡片编辑页', wait=1)
+            return self.round_retry(f'等待{self.mission_name}卡片编辑页', wait=1)
         if self._save_sent or self._menu_confirm_sent:
             self._unknown_rounds += 1
             if self._unknown_rounds <= 3:

@@ -182,7 +182,7 @@ class MacBootstrapGameSession(Operation):
         if self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册',
         ).is_success:
-            if self._has_text('大世界-手柄提示', 'LT'):
+            if self._has_text('大世界-手柄提示', 'LT') or self._area_found('大世界-手柄LT图标'):
                 return self.round_success('已截图确认手柄大世界')
 
         if self._area_found('大世界-触屏操作') and self._area_found('大世界-菜单'):

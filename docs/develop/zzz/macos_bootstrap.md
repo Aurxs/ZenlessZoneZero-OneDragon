@@ -39,3 +39,8 @@ GUI 热切换与游戏未运行时的完整冷启动均已实测通过，冷启�
 最小测试使用假窗口与假 Quartz，覆盖 Retina 和标题栏换算、窗口身份和坐标范围拒绝、默认 PID 定向投递，以及显式前台路径的输入和恢复边界。Operation 测试覆盖已是手柄时零鼠标输入、触屏逐帧切换、投递后画面未变化、断线和未知画面失败。实拍与 OCR 快照归档到测试仓 `screens/Mac启动/`；实际整段准备的通过情况记录在迁移进度中，不把单次点击响应写成完整流程通过。
 
 API 已对照本机 Xcode macOS SDK 的 `CGEvent.h`、`CGEventTypes.h`、`SCStream.h` 和 `AXUIElement.h`：`CGEventPostToPid` 从 macOS 10.11 公开，窗口字段 91/92 从 10.7 公开，`pointPixelScale` 从 14.0 公开。官方入口：[CGEventPostToPid](https://developer.apple.com/documentation/coregraphics/cgevent/posttopid(_:)?language=objc)、[pointPixelScale](https://developer.apple.com/documentation/screencapturekit/sccontentfilter/pointpixelscale)。
+
+
+## 手柄大世界提示补充
+
+大世界快捷手册模板命中后，LT 提示支持文字或独立图标模板确认。小窗口归一化可能使短文字 OCR 漏检，图标只在固定提示区匹配，不放宽大世界条件，也不以 OCR 缺失推断触屏。正式启动仍通过原准备入口；实拍见大世界画面文档。

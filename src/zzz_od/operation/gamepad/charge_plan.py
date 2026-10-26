@@ -1,4 +1,4 @@
-"""复用已有计划配置，串行运行已验证的 Mac 手柄调查专项。"""
+"""复用已有计划配置，串行运行 Mac 手柄体力副本。"""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from zzz_od.application.charge_plan.charge_plan_config import (
 from zzz_od.operation.gamepad.combat_simulation import GamepadCombatSimulation
 from zzz_od.operation.gamepad.configure_cards import GamepadConfigureCards
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
+from zzz_od.operation.gamepad.simulation_preset import BASIC_MISSIONS
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
@@ -39,7 +40,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
         'tab_name': ('训练',),
         'category_name': ('实战模拟室',),
         'mission_type_name': ('基础材料',),
-        'mission_name': ('调查专项',),
+        'mission_name': BASIC_MISSIONS,
         'level': ('默认等级',),
         'card_num': (CardNumEnum.DEFAULT.value.value, '1', '5'),
         'predefined_team_idx': tuple(range(-1, 6)),
@@ -59,7 +60,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
             if value not in values:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
-                    '目前仅支持训练/实战模拟室/基础材料/调查专项、默认等级、'
+                    '目前仅支持训练/实战模拟室/基础材料四专项、默认等级、'
                     '默认五卡、1张或5张卡片、当前编队或前六个预备编队'
                 )
         if plan.plan_times <= 0 or plan.run_times < 0:
@@ -159,10 +160,10 @@ class GamepadChargePlan(GamepadOperation):
     @operation_node(name='配置本次卡片数量', screenshot_before_round=False)
     def configure_cards(self) -> OperationRoundResult:
         """先把计划数量落实到预设，不将旧预设消耗用于判断本次是否足够。"""
-        if self._simulation is None:
+        if self._simulation is None or self.current_plan is None:
             return self.round_fail('尚未创建单次挑战')
         return self.round_by_op_result(
-            GamepadConfigureCards(self.ctx, self._simulation.expected_card_count).execute()
+            GamepadConfigureCards(self.ctx, self._simulation.expected_card_count, self.current_plan.mission_name).execute()
         )
 
     @node_from(from_name='配置本次卡片数量')
@@ -174,6 +175,8 @@ class GamepadChargePlan(GamepadOperation):
         if not (self._found('手柄-挑战等级') and self._found('手柄-下一步')):
             return self.round_retry('等待已建档的模拟室预设页', wait=1)
         self._simulation.last_screenshot = self.last_screenshot
+        if not self._simulation._preset_selected():
+            return self.round_fail('当前材料专项与计划不一致，未允许出战')
         charge = self._simulation.read_charge()
         if charge is None:
             return self.round_retry('未能确认实际电量消耗', wait=1)
@@ -218,11 +221,13 @@ class GamepadChargePlan(GamepadOperation):
         ).is_success:
             if self.config.skip_plan and self.current_plan is not None and self.current_charge is not None:
                 following = self.config.get_next_plan(self.current_plan)
-                if following is not None:
+                while following is not None:
                     required = 20 if following.card_num == '1' else 100
                     if self.current_charge >= required:
                         self.current_plan.skipped = True
                         return self.round_success(self.STATUS_TRY_NEXT_PLAN)
+                    following.skipped = True
+                    following = self.config.get_next_plan(following)
             return self._summary('电量不足，未完成计划保留')
         if self._found('手柄-挑战等级') and self._found('手柄-下一步'):
             if not self._preset_back_sent:

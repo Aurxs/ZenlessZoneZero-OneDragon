@@ -12,10 +12,13 @@ from zzz_od.application.charge_plan import charge_plan_const
 from zzz_od.application.charge_plan.charge_plan_config import CardNumEnum
 from zzz_od.operation.gamepad.configure_cards import (
     GamepadConfigureCards,
-    read_preset_charge,
-    survey_preset_focused,
 )
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
+from zzz_od.operation.gamepad.simulation_preset import (
+    BASIC_MISSIONS,
+    preset_focused,
+    read_preset_charge,
+)
 
 if TYPE_CHECKING:
     from one_dragon.base.operation.operation_base import OperationResult
@@ -28,7 +31,7 @@ if TYPE_CHECKING:
 
 
 class GamepadCombatSimulation(GamepadOperation):
-    """只运行调查专项一张或五张卡片，不变更队伍和电量来源。"""
+    """按基础材料计划运行一次，复用编队、策略和胜利记录。"""
 
     STATUS_CHARGE_NOT_ENOUGH: ClassVar[str] = '电量不足'
     STATUS_DEPLOYMENT_READY: ClassVar[str] = '出战准备就绪'
@@ -39,11 +42,13 @@ class GamepadCombatSimulation(GamepadOperation):
     def __init__(
         self, ctx: ZContext, plan: ChargePlanItem, prepare_only: bool = False,
         config: ChargePlanConfig | None = None,
+        resume_from_battle: bool = False,
     ) -> None:
         """传送后挑战一次，保留原计划和自动战斗配置。"""
         super().__init__(ctx, op_name='手柄实战模拟室单次挑战', timeout_seconds=300)
         self.plan: ChargePlanItem = plan
         self.prepare_only: bool = prepare_only
+        self.resume_from_battle: bool = resume_from_battle
         self.config: ChargePlanConfig = config if config is not None else self.ctx.run_context.get_config(
             app_id=charge_plan_const.APP_ID,
             instance_idx=self.ctx.current_instance_idx,
@@ -59,6 +64,7 @@ class GamepadCombatSimulation(GamepadOperation):
         self._preset_back_sent: bool = False
         self._category_back_sent: bool = False
         self._battle_result: str | None = None
+        self._return_to_preset_sent: bool = False
 
     def handle_init(self) -> None:
         """重新执行时清除一次性输入和战斗记录。"""
@@ -72,6 +78,7 @@ class GamepadCombatSimulation(GamepadOperation):
         self._preset_back_sent = False
         self._category_back_sent = False
         self._battle_result = None
+        self._return_to_preset_sent = False
 
     def execute(self) -> OperationResult:
         """正常、失败和异常退出都停止自动战斗。"""
@@ -102,9 +109,9 @@ class GamepadCombatSimulation(GamepadOperation):
         """兼容已有单次挑战调用，计划调度可直接读取实际电量。"""
         return self.read_charge()
 
-    def _survey_selected(self) -> bool:
-        """调查专项文字须被完整黄色卡片边框包住。"""
-        return survey_preset_focused(self.ctx, self.last_screenshot)
+    def _preset_selected(self) -> bool:
+        """配置专项文字须被完整黄色卡片边框包住。"""
+        return preset_focused(self.ctx, self.last_screenshot, self.plan.mission_name)
 
     def _deployment_visible(self) -> bool:
         """出战与预备编队同时出现才确认编队页。"""
@@ -135,12 +142,12 @@ class GamepadCombatSimulation(GamepadOperation):
             self.plan.tab_name != '训练'
             or self.plan.category_name != '实战模拟室'
             or self.plan.mission_type_name != '基础材料'
-            or self.plan.mission_name != '调查专项'
+            or self.plan.mission_name not in BASIC_MISSIONS
             or self.plan.level != '默认等级'
             or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '1', '5')
             or self.plan.predefined_team_idx not in range(-1, 6)
         ):
-            return self.round_fail('手柄实战模拟室暂仅支持调查专项1张或5张卡片、默认等级与当前编队或前六个预备编队')
+            return self.round_fail('手柄实战模拟室暂支持基础材料四专项1张或5张卡片、默认等级与当前编队或前六个预备编队')
         if self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('当前计划已完成')
         return self.round_success()
@@ -167,14 +174,25 @@ class GamepadCombatSimulation(GamepadOperation):
     @operation_node(name='配置挑战卡片')
     def prepare_cards(self) -> OperationRoundResult:
         """先配置卡片再判断电量，不因旧五卡预设误挡一张计划。"""
+        if self.resume_from_battle:
+            if self.prepare_only or self.last_screenshot is None or not self.ctx.auto_battle_context.is_normal_attack_btn_available(self.last_screenshot):
+                return self.round_fail('中断恢复须确认战斗画面，未发送输入')
+            return self.round_success('恢复已确认战斗')
         if self._deployment_visible():
-            return self.round_success()
+            if not self._return_to_preset_sent:
+                self.ctx.controller.btn_tap('east')
+                self._return_to_preset_sent = True
+            return self.round_retry('返回方案页重新确认目标材料', wait=1)
+        if self._found('手柄-挑战等级') and self._found('手柄-下一步') and self._preset_selected():
+            charge = self.read_charge()
+            if charge is not None and charge[1] == self.expected_charge:
+                return self.round_success('目标专项与卡片已确认')
         return self.round_by_op_result(
-            GamepadConfigureCards(self.ctx, self.expected_card_count).execute()
+            GamepadConfigureCards(self.ctx, self.expected_card_count, self.plan.mission_name).execute()
         )
 
     @node_from(from_name='配置挑战卡片')
-    @operation_node(name='准备当前编队', node_max_retry_times=10, timeout_seconds=15)
+    @operation_node(name='准备当前编队', node_max_retry_times=10, timeout_seconds=75)
     def prepare_deployment(self) -> OperationRoundResult:
         """核对实际预设后只按一次 Start，后续轮次等待编队画面。"""
         if self._deployment_visible():
@@ -202,8 +220,8 @@ class GamepadCombatSimulation(GamepadOperation):
             )
         if not (self._found('手柄-挑战等级') and self._found('手柄-下一步')):
             return self.round_retry('等待实战模拟室预设或出战页', wait=1)
-        if not self._survey_selected():
-            return self.round_fail('当前未选中调查专项，手柄切换预设尚未验证')
+        if not self._preset_selected():
+            return self.round_fail(f'当前未选中计划专项{self.plan.mission_name}')
         charge = self._charge()
         if charge is None:
             return self.round_retry('未能确认实际电量消耗', wait=1)
@@ -246,6 +264,7 @@ class GamepadCombatSimulation(GamepadOperation):
         return self.round_retry('等待手柄战斗画面', wait=1)
 
     @node_from(from_name='等待手柄战斗')
+    @node_from(from_name='配置挑战卡片', status='恢复已确认战斗')
     @operation_node(name='启动既有自动战斗')
     def start_auto_battle(self) -> OperationRoundResult:
         """先启用逐帧输入保护，再启动原自动战斗执行器。"""
