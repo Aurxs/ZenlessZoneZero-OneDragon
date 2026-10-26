@@ -45,6 +45,7 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
         self._multi_focus_saved: bool = False
         self._multi_slot_count: int | None = None
         self._gear_layout: bool = False
+        self._multi_verified_selected: set[int] = set()
 
     def name_rects(self) -> list[Rect]:
         """从黑色名称栏定位每卡正文，兼容一张奖励卡和多张鸣徽的位置差异。"""
@@ -181,9 +182,20 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
             return self.round_retry('等待多选的实际计数', wait=1)
         if not 0 <= actual <= count:
             return self.round_fail('多选实际计数无效')
-        rects = self.name_rects()
-        if not rects:
+        area = self.ctx.screen_loader.get_area('迷失之地-通用选择', '手柄-四候选名称')
+        if area is None:
             return self.round_retry('等待多选名称栏', wait=1)
+        # 四候选的黑色卡片名称条可能与正文连成一块，不能只数黑色轮廓。
+        rect = area.rect
+        rects = [
+            Rect(
+                rect.x1 + rect.width * index / 4,
+                rect.y1,
+                rect.x1 + rect.width * (index + 1) / 4,
+                rect.y2,
+            )
+            for index in range(4)
+        ]
         candidates = sorted(
             self.ctx.lost_void.get_artifact_pos(
                 self.last_screenshot,
@@ -209,8 +221,24 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
                 return self.round_success('本次多选已确认，后续选择交由下一次识别')
             return self.round_retry('等待多选确认生效', wait=1)
         selected = self._multi_selected_indices(candidates)
-        if selected is None or len(selected) != actual:
+        if selected is None:
             return self.round_retry('等待已选择标记与实际计数一致', wait=1)
+        highlighted = {
+            candidates.index(item) for item in self._focused_candidates(candidates)
+        }
+        selected |= self._multi_verified_selected
+        # 同流派提示会覆盖已选择文字。所有已选卡仍保留黄框；焦点在已选卡上时，
+        # 黄框数与实际计数一致才能重建整组选中项，绝不单凭同流派文字放行。
+        if actual > 0 and len(highlighted) == actual:
+            selected |= highlighted
+        if (
+            self._multi_expected_count == actual
+            and self._multi_expected_index in highlighted
+        ):
+            selected.add(self._multi_expected_index)
+        if len(selected) != actual:
+            return self.round_retry('等待已选边框与实际计数一致', wait=1)
+        self._multi_verified_selected = selected.copy()
         if self._multi_expected_count is not None:
             if actual != self._multi_expected_count:
                 self._multi_pending_waits += 1

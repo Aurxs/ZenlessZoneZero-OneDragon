@@ -21,3 +21,10 @@ added_areas:
   - 780
   - 1165
   - 985
+- area_name: 手柄-四候选名称
+  area_type: none
+  pc_rect:
+  - 170
+  - 500
+  - 1740
+  - 565
