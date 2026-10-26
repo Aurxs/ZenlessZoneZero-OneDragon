@@ -174,6 +174,8 @@ class GamepadCityFund(_GamepadRewardOperation):
                 self.ctx.controller.click(gamepad_key='menu')
                 self._menu_opened = True
             return self.round_retry('等待游戏菜单', wait=0.8)
+        if (self._menu_opened or self._entered) and self.node_retry_times < 16:
+            return self.round_retry('等待菜单或城募入场动画结束', wait=0.5)
         return self._pending_evidence('city_unknown_entry', '城募入口画面尚未建档')
 
     @node_from(from_name='打开丽都城募')
