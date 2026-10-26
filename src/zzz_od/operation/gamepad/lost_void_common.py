@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import time
 from typing import TYPE_CHECKING
 
 import cv2
@@ -27,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class GamepadLostVoidChooseCommon(GamepadOperation):
-    """单选随焦点变化，确认前核对原策略目标和已选择标记。"""
+    """按实际焦点和计数选择，连续获得提示逐项核对后交回父流程。"""
 
     def __init__(self, ctx: ZContext) -> None:
         super().__init__(ctx, op_name='手柄迷失之地通用选择', timeout_seconds=60)
@@ -46,6 +48,76 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
         self._multi_slot_count: int | None = None
         self._gear_layout: bool = False
         self._multi_verified_selected: set[int] = set()
+        self._gain_identity: tuple[str, ...] | None = None
+        self._gain_probe: tuple[str, ...] | None = None
+        self._gain_attempts: int = 0
+        self._gain_sent_at: float = 0
+        self._gain_frame_time: float = -1
+
+    def gained_item_identity(self, title: str) -> tuple[str, ...] | None:
+        """按名称与等级区分连续获得提示，不用动态背景像素判断换页。"""
+        names = set()
+        for rect in self.name_rects():
+            words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, rect)
+            names.update(
+                ''.join(text.split()) for text in words if len(text.strip()) >= 2
+            )
+        if not names:
+            return None
+        area = self.navigation._read_area('迷失之地-通用选择', '手柄-名称栏搜索')
+        levels = (
+            [
+                int(value)
+                for text in area[1]
+                for value in re.findall(r'等级\s*(\d+)', text)
+            ]
+            if area
+            else []
+        )
+        return (
+            ''.join(title.split()),
+            *sorted(names),
+            f'等级{max(levels)}' if levels else '',
+        )
+
+    def confirm_gain(self, title: str) -> OperationRoundResult:
+        """新提示交回父流程；同一提示只在新帧仍明确时有限重试。"""
+        identity = self.gained_item_identity(title)
+        if (
+            self._confirmed
+            and identity is not None
+            and self._gain_identity is not None
+            and identity != self._gain_identity
+        ):
+            if identity == self._gain_probe:
+                self.ctx.lost_void.priority_updated = False
+                return self.round_success('本次获得已确认，新的获得提示交回父流程')
+            self._gain_probe = identity
+            return self.round_retry('核对连续获得提示的名称或等级变化', wait=0.6)
+        self._gain_probe = None
+        now = time.monotonic()
+        if self._confirmed:
+            if (
+                now - self._gain_sent_at < 2
+                or self.last_screenshot_time <= self._gain_frame_time
+            ):
+                return self.round_retry('等待获得提示关闭', wait=0.6)
+            if self._gain_attempts >= 3:
+                self.save_screenshot(prefix='macos_lost_void_gain_confirm_pending')
+                return self.round_fail('同一获得提示确认三次未响应，已停止')
+        footer = self.navigation._read_area('迷失之地-通用选择', '手柄-确认底栏')
+        if footer is None or not all(
+            self.navigation._text_rect(footer[1], word) is not None
+            for word in ('A', '确定')
+        ):
+            return self.round_retry('等待获得提示的A确定', wait=1)
+        self._gain_identity = identity
+        self.ctx.controller.btn_tap('south')
+        self._confirmed = True
+        self._gain_attempts += 1
+        self._gain_sent_at = now
+        self._gain_frame_time = self.last_screenshot_time
+        return self.round_retry('等待获得提示关闭', wait=1)
 
     def name_rects(self) -> list[Rect]:
         """从黑色名称栏定位每卡正文，兼容一张奖励卡和多张鸣徽的位置差异。"""
@@ -354,10 +426,7 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
                 word in title for word in ('获得武备', '武备已升级', '获得战利品')
             ):
                 return self.round_fail('未识别藏品选择数量，未确认')
-            if not self._confirmed:
-                self.ctx.controller.btn_tap('south')
-                self._confirmed = True
-            return self.round_retry('等待获得提示关闭', wait=1)
+            return self.confirm_gain(title)
         rects = self.name_rects()
         if not rects:
             return self.round_retry('等待实际卡片名称栏', wait=1)
