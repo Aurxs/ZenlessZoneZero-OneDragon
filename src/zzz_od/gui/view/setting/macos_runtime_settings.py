@@ -54,11 +54,17 @@ class MacRuntimeSettings(QObject):
         self.macos_launch_timeout_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_launch_timeout_opt)
         self.macos_top_inset_opt: SpinBoxSettingCard = SpinBoxSettingCard(
-            icon=FluentIcon.PHOTO, title='截图顶部裁剪', minimum=0, maximum=256,
-            content='填已确认的标题栏像素高度；无标题栏填 0，剩余游戏内容须为 16:9',
+            icon=FluentIcon.PHOTO, title='截图顶部裁剪（旧像素配置）', minimum=0, maximum=256,
+            content='逻辑点高度为0时使用本值；保留已有像素设置，剩余内容须为16:9',
         )
         self.macos_top_inset_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_top_inset_opt)
+        self.macos_top_inset_points_opt: SpinBoxSettingCard = SpinBoxSettingCard(
+            icon=FluentIcon.PHOTO,title='标题栏高度（逻辑点）',minimum=0,maximum=256,
+            content='填写已确认的窗口标题栏逻辑点高度；非0时按每帧缩放换算，优先于旧像素配置',
+        )
+        self.macos_top_inset_points_opt.value_changed.connect(self._on_mac_config_changed)
+        group.addSettingCard(self.macos_top_inset_points_opt)
         self.macos_menu_interval_opt: SpinBoxSettingCard = SpinBoxSettingCard(
             icon=FluentIcon.HISTORY, title='界面操作间隔（毫秒）', minimum=0, maximum=2000,
             content='默认 500 毫秒（0.5 秒），每个手柄界面步骤至少等待此时长；不影响战斗策略',
@@ -78,6 +84,9 @@ class MacRuntimeSettings(QObject):
         )
         self.macos_top_inset_opt.init_with_adapter(
             self.ctx.macos_config.get_prop_adapter('capture_top_inset_pixels'),
+        )
+        self.macos_top_inset_points_opt.init_with_adapter(
+            self.ctx.macos_config.get_prop_adapter('capture_top_inset_points'),
         )
 
     def _on_mac_platform_changed(self, index: int, value: str) -> None:

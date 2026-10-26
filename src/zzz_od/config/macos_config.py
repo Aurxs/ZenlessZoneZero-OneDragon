@@ -101,6 +101,18 @@ class MacOsConfig(YamlConfig):
         self.update('capture_top_inset_pixels', value)
 
     @property
+    def capture_top_inset_points(self) -> int:
+        """返回已确认的标题栏逻辑点高度；非零时优先于旧像素配置。"""
+        return self.get('capture_top_inset_points',0)
+
+    @capture_top_inset_points.setter
+    def capture_top_inset_points(self, value: int) -> None:
+        """保存独立于显示缩放的标题栏高度，不猜测画面边界。"""
+        if type(value) is not int or not 0 <= value <= 256:
+            raise ValueError('标题栏逻辑点高度须为0至256的整数')
+        self.update('capture_top_inset_points',value)
+
+    @property
     def max_frame_age_seconds(self) -> float:
         """返回允许使用的最大帧龄。"""
         return self.get('max_frame_age_seconds', 0.5)

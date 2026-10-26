@@ -137,12 +137,19 @@ class MacBootstrapGameSession(Operation):
                     )
 
                     controller = self.ctx.controller
-                    self._pointer = MacBootstrapPointer(
-                        controller.window_capture.window,
-                        window_capture=controller.window_capture,
-                        top_inset_pixels=controller.macos_config.capture_top_inset_pixels,
-                        foreground=True,
-                    )
+                    points = getattr(controller.macos_config,'capture_top_inset_points',0)
+                    if points:
+                        self._pointer = MacBootstrapPointer(
+                            controller.window_capture.window,window_capture=controller.window_capture,
+                            top_inset_points=points,foreground=True,
+                        )
+                    else:
+                        self._pointer = MacBootstrapPointer(
+                            controller.window_capture.window,
+                            window_capture=controller.window_capture,
+                            top_inset_pixels=controller.macos_config.capture_top_inset_pixels,
+                            foreground=True,
+                        )
                 if not self._pointer.click(rect.center.x, rect.center.y):
                     return self.round_fail(f'{action}的定向点击未完成')
         except Exception as error:

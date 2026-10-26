@@ -85,9 +85,12 @@ def game_point_to_screen(
     y: float,
     *,
     top_inset_pixels: int = 0,
+    top_inset_points: float = 0,
 ) -> tuple[float, float]:
     """把标准游戏内容坐标换成当前窗口内的全局逻辑点，拒绝猜测裁剪。"""
     _validate_binding(window, top_inset_pixels)
+    if not math.isfinite(top_inset_points) or top_inset_points < 0 or (top_inset_points and top_inset_pixels):
+        raise ValueError('启动裁剪逻辑点无效或与像素配置冲突')
     if (current.bundle_id, current.pid, current.window_id) != (
         window.bundle_id,
         window.pid,
@@ -113,7 +116,7 @@ def game_point_to_screen(
     if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < 1920 and 0 <= y < 1080):
         raise MacBootstrapError('启动点击坐标必须在 1920×1080 游戏内容范围内')
 
-    top_inset_points = top_inset_pixels / current.pixels_per_point
+    top_inset_points = top_inset_points or top_inset_pixels / current.pixels_per_point
     content_height = current.height - top_inset_points
     if content_height <= 0 or not math.isclose(
         current.width / content_height, 16 / 9, rel_tol=0.002
@@ -141,15 +144,19 @@ class MacBootstrapPointer:
         window: MacWindow,
         *,
         top_inset_pixels: int = 0,
+        top_inset_points: float = 0,
         window_capture: MacWindowCapture | None = None,
         foreground: bool = False,
     ) -> None:
         """绑定已选定的窗口；构造时不加载原生框架或投递输入。"""
         _validate_binding(window, top_inset_pixels)
+        if not math.isfinite(top_inset_points) or top_inset_points < 0 or (top_inset_points and top_inset_pixels):
+            raise ValueError('启动裁剪逻辑点无效或与像素配置冲突')
         if type(foreground) is not bool:
             raise ValueError('前台启动点击选项必须是布尔值')
         self._window: MacWindow = window
         self._top_inset_pixels: int = top_inset_pixels
+        self._top_inset_points: float = top_inset_points
         self._foreground: bool = foreground
         self._capture: MacWindowCapture = (
             window_capture if window_capture is not None else MacWindowCapture()
@@ -244,6 +251,7 @@ class MacBootstrapPointer:
             x,
             y,
             top_inset_pixels=self._top_inset_pixels,
+            top_inset_points=self._top_inset_points,
         )
 
     def click(self, x: float, y: float, *, press_seconds: float = 0.05) -> bool:

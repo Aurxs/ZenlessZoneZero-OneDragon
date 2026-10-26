@@ -189,10 +189,14 @@ class ZMacController(ControllerBase):
             self.gamepad.suspend()
             window = self.game_launcher.ensure_window()
             self._started_game_this_run = self.game_launcher.started_game
-            self.window_capture.start(
-                window, fps=self.macos_config.capture_fps,
-                top_inset_pixels=self.macos_config.capture_top_inset_pixels,
-            )
+            points = getattr(self.macos_config,'capture_top_inset_points',0)
+            if points:
+                self.window_capture.start(window,fps=self.macos_config.capture_fps,top_inset_points=points)
+            else:
+                self.window_capture.start(
+                    window, fps=self.macos_config.capture_fps,
+                    top_inset_pixels=self.macos_config.capture_top_inset_pixels,
+                )
             deadline = time.monotonic() + 2.0
             while self.window_capture.latest_frame(max_age_seconds=self.macos_config.max_frame_age_seconds) is None:
                 if self.window_capture.last_error or time.monotonic() >= deadline:

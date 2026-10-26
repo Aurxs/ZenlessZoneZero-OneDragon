@@ -20,6 +20,7 @@ class CapturedFrame:
     monotonic_time: float
     raw_width: int
     raw_height: int
+    pixel_scale: float = 1.0  # 原窗口逻辑点到当前输出像素的完整缩放。
 
 
 def bgra_buffer_to_rgb(

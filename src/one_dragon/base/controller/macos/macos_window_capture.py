@@ -147,6 +147,7 @@ class MacWindowCapture:
         self._last_error: str | None = None
         self._content_rect: tuple[int, int, int, int] | None = None
         self._top_inset_pixels: int = 0
+        self._top_inset_points: float = 0
         self.window: MacWindow | None = None
 
     @property
@@ -252,13 +253,18 @@ class MacWindowCapture:
         fps: int = 30,
         content_rect: tuple[int, int, int, int] | None = None,
         top_inset_pixels: int = 0,
+        top_inset_points: float = 0,
     ) -> None:
-        """绑定窗口；支持显式顶部裁剪或固定游戏区，两者不能同时使用。"""
+        """绑定窗口；像素、逻辑点裁剪和固定游戏区只能选一种。"""
         if not 1 <= fps <= 120:
             raise ValueError('采集帧率必须在 1 到 120 之间')
         if type(top_inset_pixels) is not int or top_inset_pixels < 0:
             raise ValueError('顶部裁剪像素必须是非负整数')
-        if top_inset_pixels and content_rect is not None:
+        if not math.isfinite(top_inset_points) or top_inset_points < 0:
+            raise ValueError('顶部裁剪逻辑点必须是非负有限数')
+        if top_inset_points and top_inset_pixels:
+            raise ValueError('不能同时指定顶部裁剪像素和逻辑点')
+        if (top_inset_pixels or top_inset_points) and content_rect is not None:
             raise ValueError('顶部裁剪和固定游戏内容区不能同时使用')
         self.stop()
         cm, dispatch, _, quartz, sck, output_class = _native_api()
@@ -309,6 +315,7 @@ class MacWindowCapture:
             self._last_error = None
             self._content_rect = content_rect
             self._top_inset_pixels = top_inset_pixels
+            self._top_inset_points = top_inset_points
             self.window = window
         try:
             error, = self._wait(stream.startCaptureWithCompletionHandler_, '启动窗口采集')
@@ -416,6 +423,15 @@ class MacWindowCapture:
             )
             if not valid_rect:
                 raise MacCaptureError('采集帧缺少有效内容区')
+            scale_factor = float(metadata[sck.SCStreamFrameInfoScaleFactor])
+            content_scale_key = getattr(sck,'SCStreamFrameInfoContentScale',None)
+            if self._top_inset_points and content_scale_key not in metadata:
+                raise MacCaptureError('逻辑点裁剪需要采集帧的内容缩放元数据')
+            content_scale = float(metadata.get(content_scale_key,1.0))
+            # 标题栏来自原窗口逻辑点，须包括内容缩放；contentRect本身已经包含该缩放。
+            pixel_scale = scale_factor * content_scale
+            if not math.isfinite(pixel_scale) or pixel_scale <= 0:
+                raise MacCaptureError('采集帧的逻辑点与像素缩放无效')
             lock_flags = quartz.kCVPixelBufferLock_ReadOnly
             if quartz.CVPixelBufferLockBaseAddress(image_buffer, lock_flags) != 0:
                 raise MacCaptureError('无法读取采集像素缓冲')
@@ -424,7 +440,7 @@ class MacWindowCapture:
                 image = bgra_buffer_to_rgb(
                     address.as_buffer(height * bytes_per_row), width, height, bytes_per_row,
                     content_rect=(rect.origin.x, rect.origin.y, rect.size.width, rect.size.height),
-                    scale_factor=float(metadata[sck.SCStreamFrameInfoScaleFactor]),
+                    scale_factor=scale_factor,
                 )
             finally:
                 quartz.CVPixelBufferUnlockBaseAddress(image_buffer, lock_flags)
@@ -450,7 +466,7 @@ class MacWindowCapture:
                     self._content_verified = True
                 self._sequence += 1
                 self._raw_size = (width, height)
-                self._latest = CapturedFrame(image, self._sequence, capture_time, monotonic_time, width, height)
+                self._latest = CapturedFrame(image, self._sequence, capture_time, monotonic_time, width, height,pixel_scale)
                 self._last_observation_monotonic = monotonic_time
                 self._freshness_error = None
                 self._last_error = None
@@ -485,10 +501,15 @@ class MacWindowCapture:
             stream = self._stream
             content_rect = self._content_rect
             top_inset_pixels = self._top_inset_pixels
+            top_inset_points = self._top_inset_points
         frame = self.latest_raw_frame(max_age_seconds=max_age_seconds)
         if frame is None:
             return None
         try:
+            if top_inset_points:
+                if not math.isfinite(frame.pixel_scale) or frame.pixel_scale <= 0:
+                    raise ValueError('采集帧的逻辑点与像素缩放无效')
+                top_inset_pixels = round(top_inset_points * frame.pixel_scale)
             image = normalize_game_frame(
                 frame.image, content_rect=content_rect, top_inset_pixels=top_inset_pixels,
             )
@@ -521,6 +542,7 @@ class MacWindowCapture:
             self.window = None
             self._content_rect = None
             self._top_inset_pixels = 0
+            self._top_inset_points = 0
         if output is not None:
             output.bind(None)
         if stream is not None:
