@@ -21,3 +21,10 @@ added_areas:
   - 245
   - 1690
   - 955
+- area_name: 手柄-培养头像标记
+  area_type: none
+  pc_rect:
+  - 1245
+  - 330
+  - 1320
+  - 960

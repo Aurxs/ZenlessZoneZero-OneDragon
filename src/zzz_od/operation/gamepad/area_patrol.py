@@ -66,7 +66,10 @@ class GamepadChargeBackToWorld(GamepadOperation):
                 self._list_back_sent = True
             return self.round_retry('等待模拟室分类页退出', wait=1)
         if self.category_name == '专业挑战室':
-            selected, _ = read_focused_choice(self.ctx, self.last_screenshot, '手柄-副本列表', charge_mission_names('专业挑战室'), '专业挑战室')
+            # 活动目标在游戏列表中带引号，仍要求完整名字处于选中黄框内。
+            names = tuple(variant for name in charge_mission_names('专业挑战室')
+                          for variant in (name, f'「{name}」', f'「{name}', f'{name}」'))
+            selected, _ = read_focused_choice(self.ctx, self.last_screenshot, '手柄-副本列表', names, '专业挑战室')
             if selected is not None:
                 if not self._list_back_sent:
                     self.ctx.controller.btn_tap('east')
@@ -101,7 +104,7 @@ class GamepadAreaPatrol(GamepadCombatSimulation):
         title = read_preset_area(self.ctx, self.last_screenshot, '手柄-副本标题', '区域巡防')
         if title is None or not any(text.replace(' ', '') == self.plan.mission_type_name for text in title[1]):
             return False
-        selected, _ = read_focused_choice(self.ctx, self.last_screenshot, '手柄-副本列表', charge_mission_names('区域巡防'), '区域巡防', border_gap=35)
+        selected, _ = read_focused_choice(self.ctx, self.last_screenshot, '手柄-副本列表', charge_mission_names('区域巡防'), '区域巡防', border_gap=35, allow_corner_gap=True)
         return selected == self.plan.mission_type_name
 
     @operation_node(name='检查手柄计划', is_start_node=True)

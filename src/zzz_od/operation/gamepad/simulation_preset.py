@@ -64,7 +64,7 @@ def read_preset_charge(ctx: ZContext, screen: MatLike | None) -> tuple[int, int]
 
 def read_focused_choice(
     ctx: ZContext, screen: MatLike | None, area_name: str, names: tuple[str, ...],
-    screen_name: str = '实战模拟室', border_gap: int = 5,
+    screen_name: str = '实战模拟室', border_gap: int = 5, allow_corner_gap: bool = False,
 ) -> tuple[str | None, set[str]]:
     """一次 OCR 匹配名称和完整黄框，同时返回可见目标。"""
     area = read_preset_area(ctx, screen, area_name, screen_name)
@@ -81,8 +81,15 @@ def read_focused_choice(
     selected: set[str] = set()
     for contour in contours:
         x, y, width, height = cv2.boundingRect(contour)
-        if width < 150 or height < 100 or cv2.contourArea(contour) / (width * height) < 0.75:
+        if width < 150 or height < 100:
             continue
+        if cv2.contourArea(contour) / (width * height) < 0.75:
+            # 培养头像遮住角落时，仍要求四条边大部存在，不能仅凭外接矩形放行。
+            border = mask[y:y + height, x:x + width]
+            coverage = (border[:12].any(axis=0).mean(), border[-12:].any(axis=0).mean(),
+                        border[:, :12].any(axis=1).mean(), border[:, -12:].any(axis=1).mean())
+            if not allow_corner_gap or min(coverage) < 0.6 or cv2.contourArea(cv2.convexHull(contour)) / (width * height) < 0.85:
+                continue
         for text, matches in results.items():
             name = text.replace(' ', '')
             target = matches.max
