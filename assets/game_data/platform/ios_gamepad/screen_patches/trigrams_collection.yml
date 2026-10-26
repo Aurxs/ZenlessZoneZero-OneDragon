@@ -1,0 +1,108 @@
+screen_id: trigrams_collection
+added_areas:
+- area_name: 手柄-标题
+  area_type: text
+  pc_rect:
+  - 1300
+  - 915
+  - 1620
+  - 985
+  text: 卦象集录
+  lcs_percent: 0.9
+- area_name: 手柄-占卜提示
+  area_type: text
+  pc_rect:
+  - 1290
+  - 910
+  - 1640
+  - 1045
+  text: 占卜
+  lcs_percent: 0.9
+- area_name: 手柄-摇杆提示
+  area_type: text
+  pc_rect:
+  - 800
+  - 910
+  - 1120
+  - 975
+  text: 拨动右摇杆以获取卦象
+  lcs_percent: 0.9
+- area_name: 手柄-占卜进度
+  area_type: none
+  pc_rect:
+  - 900
+  - 960
+  - 1040
+  - 1015
+- area_name: 手柄-奖励标题
+  area_type: text
+  pc_rect:
+  - 900
+  - 390
+  - 1020
+  - 450
+  text: 获得
+  lcs_percent: 0.9
+- area_name: 手柄-奖励选择提示
+  area_type: text
+  pc_rect:
+  - 1000
+  - 785
+  - 1110
+  - 840
+  text: 选择
+  lcs_percent: 0.9
+- area_name: 手柄-奖励确认
+  area_type: none
+  pc_rect:
+  - 800
+  - 680
+  - 1120
+  - 775
+- area_name: 手柄-结果确认
+  area_type: text
+  pc_rect:
+  - 975
+  - 930
+  - 1290
+  - 1000
+  text: 确认
+  lcs_percent: 0.9
+- area_name: 手柄-结果解卦
+  area_type: text
+  pc_rect:
+  - 630
+  - 930
+  - 945
+  - 1000
+  text: 解卦
+  lcs_percent: 0.9
+- area_name: 手柄-娱乐说明
+  area_type: text
+  pc_rect:
+  - 750
+  - 1000
+  - 1165
+  - 1060
+  text: 算卦占卜只作娱乐
+  lcs_percent: 0.85
+- area_name: 手柄-可占卜封面
+  area_type: template
+  pc_rect:
+  - 1340
+  - 345
+  - 1580
+  - 575
+  template_sub_dir: ios_trigrams
+  template_id: main_open
+  template_match_threshold: 0.9
+- area_name: 手柄-已完成封面
+  area_type: template
+  pc_rect:
+  - 1340
+  - 345
+  - 1580
+  - 575
+  template_sub_dir: ios_trigrams
+  template_id: main_closed
+  template_match_threshold: 0.9

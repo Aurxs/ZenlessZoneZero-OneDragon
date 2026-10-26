@@ -1,0 +1,8 @@
+sub_dir: ios_trigrams
+template_id: main_open
+template_name: 手柄卦象集录可占卜
+template_shape: rectangle
+auto_mask: true
+point_list:
+- 1350, 355
+- 1570, 565

@@ -1,3 +1,5 @@
+import sys
+
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
@@ -15,7 +17,7 @@ class DailySignInApp(ZApplication):
     流程: 代理运行用户所选的具体每日签到应用（吼吼饼铺、卦象集录、刮刮卡）。
     """
 
-    def __init__(self, ctx: ZContext, instance_idx: int, group_id: str):
+    def __init__(self, ctx: ZContext, instance_idx: int, group_id: str) -> None:
         """初始化每日签到应用。
 
         Args:
@@ -43,6 +45,13 @@ class DailySignInApp(ZApplication):
         sub_app_id: str = self.config.selected_sign
         if not sub_app_id:
             return self.round_fail(status='未选择子应用')
+
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.signin import GamepadDailySignIn
+
+            return self.round_by_op_result(
+                GamepadDailySignIn(self.ctx, sub_app_id).execute()
+            )
 
         app = self.ctx.run_context.get_application(
             app_id=sub_app_id,
