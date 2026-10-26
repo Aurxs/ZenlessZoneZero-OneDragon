@@ -2,13 +2,13 @@ screen_id: notorious_hunt
 area_patches:
   标识-BOSS血条:
     template_match_threshold: 0.85
-    template_sub_dir: ios_gamepad
+    template_id: boss_life_start
     pc_rect:
     - 1080
     - 25
     - 1760
     - 115
-    template_id: boss_life_start
+    template_sub_dir: ios_gamepad
 added_areas:
 - area_name: 手柄-页面文字
   area_type: none
@@ -49,3 +49,35 @@ added_areas:
   - 330
   - 1450
   - 390
+- area_name: 手柄-挑战等级
+  area_type: text
+  pc_rect:
+  - 1400
+  - 15
+  - 1570
+  - 90
+  text: 挑战等级
+  lcs_percent: 0.8
+- area_name: 手柄-下一步
+  area_type: text
+  pc_rect:
+  - 1670
+  - 990
+  - 1805
+  - 1065
+  text: 下一步
+  lcs_percent: 0.8
+- area_name: 手柄-副本标题
+  area_type: none
+  pc_rect:
+  - 730
+  - 175
+  - 1400
+  - 265
+- area_name: 手柄-深度开关
+  area_type: none
+  pc_rect:
+  - 1380
+  - 660
+  - 1810
+  - 750

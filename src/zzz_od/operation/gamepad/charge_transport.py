@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
+from one_dragon.utils.str_utils import longest_common_subsequence_length
 from zzz_od.game_data.compendium import CompendiumService
 from zzz_od.operation.gamepad.focus import (
     find_yellow_frames,
@@ -30,6 +31,31 @@ def charge_mission_names(category_name: str) -> tuple[str, ...]:
     service.reload()
     category = service.get_category_data('训练', category_name)
     return tuple(item.mission_type_name for item in category.mission_type_list if not item.is_agent_plan) if category else ()
+
+
+@cache
+def charge_mission_aliases(category_name: str) -> dict[str, tuple[str, ...]]:
+    """复用原资源声明的剧情隐藏名，映射回同一个计划目标。"""
+    service = CompendiumService()
+    service.reload()
+    category = service.get_category_data('训练', category_name)
+    return {item.mission_type_name: (item.mission_type_name, *item.alias_list) for item in category.mission_type_list if not item.is_agent_plan} if category else {}
+
+
+def match_charge_mission(text: str, category_name: str) -> str | None:
+    """统一间隔点；剧情问号别名仅容忍一字OCR误差，且必须唯一匹配。"""
+    def normalize(value: str) -> str:
+        return value.replace(' ', '').replace('・', '·').replace('•', '·').replace('？', '?').strip('「」')
+
+    text = normalize(text)
+    matched: set[str] = set()
+    for name, aliases in charge_mission_aliases(category_name).items():
+        for alias in aliases:
+            value = normalize(alias)
+            if text == value or ('???' in value and '???' in text and len(value) == len(text)
+                                 and longest_common_subsequence_length(value, text) >= len(value) - 1):
+                matched.add(name)
+    return next(iter(matched)) if len(matched) == 1 else None
 
 
 class GamepadChargeTransport(GamepadOperation):
@@ -61,7 +87,7 @@ class GamepadChargeTransport(GamepadOperation):
     @operation_node(name='检查副本目标', is_start_node=True, screenshot_before_round=False)
     def check_target(self) -> OperationRoundResult:
         """普通副本从原数据取名，特训目标另行适配。"""
-        if self.category_name not in ('区域巡防', '专业挑战室'):
+        if self.category_name not in ('区域巡防', '专业挑战室', '恶名狩猎'):
             return self.round_fail(f'尚未开放手册分类：{self.category_name}')
         self._names = charge_mission_names(self.category_name)
         if self.target not in self._names:
@@ -107,10 +133,19 @@ class GamepadChargeTransport(GamepadOperation):
         if area is None:
             return self.round_retry('等待副本列表', wait=0.7)
         image, words = area
+        cycle = nav._text_rect(words, '周期挑战')
+        if self.category_name == '恶名狩猎' and cycle is not None and has_filled_highlight(image, cycle, 'yellow'):
+            self.ctx.controller.btn_tap('dpad_down')
+            self._entered = True
+            return self.round_retry('从周期奖励进入Boss列表', wait=0.7)
         frames = find_yellow_frames(image)
         buttons = [match.rect for text, matches in words.items() if text.replace(' ', '') == '前往'
                    for match in matches if has_filled_highlight(image, match.rect, 'yellow')]
-        visible = {name: rect for name in self._names if (rect := nav._text_rect(words, name)) is not None}
+        visible = {}
+        for text, matches in words.items():
+            name = match_charge_mission(text, self.category_name)
+            if name is not None and matches.max is not None:
+                visible[name] = matches.max.rect
         selected: list[str] = []
         for name, rect in visible.items():
             if text_inside_frame(rect, frames) or (
@@ -172,7 +207,7 @@ class GamepadChargeTransport(GamepadOperation):
         """落地后保留真实画面，后续单场再次核对目标与电量。"""
         if self.last_screenshot is not None and all(
             self.round_by_find_area(self.last_screenshot, self.category_name, name).is_success
-            for name in ('手柄-挑战等级', '手柄-下一步')
+            for name in (('手柄-挑战等级',) if self.category_name == '恶名狩猎' else ('手柄-挑战等级', '手柄-下一步'))
         ):
             self.save_screenshot(prefix='macos_charge_entry')
             return self.round_success(f'已抵达{self.category_name}准备页')
