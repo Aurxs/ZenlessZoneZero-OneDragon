@@ -21,6 +21,9 @@ from zzz_od.operation.gamepad.transport_by_compendium import (
 )
 
 if TYPE_CHECKING:
+    from cv2.typing import MatLike
+
+    from one_dragon.base.matcher.match_result import MatchResultList
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.application.hollow_zero.lost_void.operation.interact.lost_void_artifact_pos import (
         LostVoidArtifactPos,
@@ -106,10 +109,7 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
                 self.save_screenshot(prefix='macos_lost_void_gain_confirm_pending')
                 return self.round_fail('同一获得提示确认三次未响应，已停止')
         footer = self.navigation._read_area('迷失之地-通用选择', '手柄-确认底栏')
-        if footer is None or not all(
-            self.navigation._text_rect(footer[1], word) is not None
-            for word in ('A', '确定')
-        ):
+        if not self.has_a_confirmation(footer):
             return self.round_retry('等待获得提示的A确定', wait=1)
         self._gain_identity = identity
         self.ctx.controller.btn_tap('south')
@@ -118,6 +118,21 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
         self._gain_sent_at = now
         self._gain_frame_time = self.last_screenshot_time
         return self.round_retry('等待获得提示关闭', wait=1)
+
+    def has_a_confirmation(self, footer: tuple[MatLike, dict[str, MatchResultList]] | None) -> bool:
+        """确定文字存在时，以同排左侧的实拍图标补足 OCR 漏掉的 A。"""
+        if footer is None:
+            return False
+        image, words = footer
+        button = self.navigation._text_rect(words, '确定')
+        if button is None:
+            return False
+        if any(text.strip().upper() == 'A' and matches.max is not None for text, matches in words.items()):
+            return True
+        return any(
+            prompt.x + prompt.w < button.x1 and abs(prompt.center.y - button.center.y) <= 40
+            for prompt in self.ctx.tm.match_template(image, 'ios_gamepad', 'dialog_a', threshold=0.8)
+        )
 
     def name_rects(self) -> list[Rect]:
         """从黑色名称栏定位每卡正文，兼容一张奖励卡和多张鸣徽的位置差异。"""
@@ -468,10 +483,7 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
             return self.round_retry('等待原优先级藏品进入焦点', wait=0.7)
         if self._gear_layout:
             footer = self.navigation._read_area('迷失之地-通用选择', '手柄-确认底栏')
-            if footer is None or not all(
-                self.navigation._text_rect(footer[1], word) is not None
-                for word in ('A', '确定')
-            ):
+            if not self.has_a_confirmation(footer):
                 return self.round_retry('等待武备单选的A确认提示', wait=1)
         elif not any(item.artifact.display_name == self._target for item in chosen):
             return self.round_retry('等待目标藏品已选择标记', wait=0.7)
