@@ -43,6 +43,8 @@ class GamepadTransportByCompendium(GamepadOperation):
         self.category_name: str = category_name
         self.mission_type_name: str | None = mission_type_name
         self._opened: bool = False
+        self._open_attempts: int = 0
+        self._world_waits: int = 0
         self._entered_list: bool = False
         self._requested_teleport: bool = False
         self._confirmed_teleport: bool = False
@@ -50,6 +52,8 @@ class GamepadTransportByCompendium(GamepadOperation):
     def handle_init(self) -> None:
         """重复执行前清除一次性按键记录。"""
         self._opened = False
+        self._open_attempts = 0
+        self._world_waits = 0
         self._entered_list = False
         self._requested_teleport = False
         self._confirmed_teleport = False
@@ -122,11 +126,16 @@ class GamepadTransportByCompendium(GamepadOperation):
             return self.round_retry('截图无效', wait=1)
         if self._selected('手柄-顶部标签', self.TABS, 'yellow') is not None:
             return self.round_success()
-        if not self._opened and self.round_by_find_area(
-            self.last_screenshot, '大世界-普通', '快捷手册'
-        ).is_success:
-            if self.ctx.controller.click(gamepad_key='compendium'):
-                self._opened = True
+        if self.round_by_find_area(self.last_screenshot, '大世界-普通', '快捷手册').is_success:
+            self._world_waits += 1
+            # 首次未响应时，连续新轮次仍是大世界才重试一次。
+            if self._open_attempts < 2 and (not self._opened or self._world_waits >= 3):
+                if self.ctx.controller.click(gamepad_key='compendium'):
+                    self._opened = True
+                    self._open_attempts += 1
+                    self._world_waits = 0
+        else:
+            self._world_waits = 0
         return self.round_retry('等待手柄快捷手册', wait=1)
 
     @node_from(from_name='打开快捷手册')
