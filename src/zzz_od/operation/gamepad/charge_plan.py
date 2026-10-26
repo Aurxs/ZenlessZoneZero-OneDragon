@@ -42,7 +42,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
         'mission_name': ('调查专项',),
         'level': ('默认等级',),
         'card_num': (CardNumEnum.DEFAULT.value.value, '1', '5'),
-        'predefined_team_idx': (-1,),
+        'predefined_team_idx': tuple(range(-1, 6)),
     }
     labels: dict[str, str] = {
         'tab_name': '标签页',
@@ -60,7 +60,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
                     '目前仅支持训练/实战模拟室/基础材料/调查专项、默认等级、'
-                    '默认五卡、1张或5张卡片、当前编队'
+                    '默认五卡、1张或5张卡片、当前编队或前六个预备编队'
                 )
         if plan.plan_times <= 0 or plan.run_times < 0:
             return f'Mac 体力计划第 {index} 项的计划次数必须大于零，已运行次数不能为负'

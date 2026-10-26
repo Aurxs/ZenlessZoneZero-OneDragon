@@ -47,6 +47,7 @@ class GamepadCombatSimulation(ZOperation):
             instance_idx=self.ctx.current_instance_idx,
             group_id=application_const.DEFAULT_GROUP_ID,
         )
+        self._team_prepared: bool = False
         self._next_sent: bool = False
         self._deploy_sent: bool = False
         self._battle_active: bool = False
@@ -60,6 +61,7 @@ class GamepadCombatSimulation(ZOperation):
     def handle_init(self) -> None:
         """重新执行时清除一次性输入和战斗记录。"""
         self._next_sent = False
+        self._team_prepared = False
         self._deploy_sent = False
         self._battle_active = False
         self._recorded = False
@@ -134,9 +136,9 @@ class GamepadCombatSimulation(ZOperation):
             or self.plan.mission_name != '调查专项'
             or self.plan.level != '默认等级'
             or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '1', '5')
-            or self.plan.predefined_team_idx != -1
+            or self.plan.predefined_team_idx not in range(-1, 6)
         ):
-            return self.round_fail('手柄实战模拟室暂仅支持调查专项1张或5张卡片、默认等级与当前编队')
+            return self.round_fail('手柄实战模拟室暂仅支持调查专项1张或5张卡片、默认等级与当前编队或前六个预备编队')
         if self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('当前计划已完成')
         return self.round_success()
@@ -148,7 +150,13 @@ class GamepadCombatSimulation(ZOperation):
         if self.prepare_only:
             return self.round_success()
         battle = self.ctx.auto_battle_context
-        battle.init_auto_op(op_name=self.plan.auto_battle_config, sub_dir='auto_battle')
+        strategy = self.plan.auto_battle_config
+        if self.plan.predefined_team_idx >= 0:
+            team = self.ctx.team_config.get_team_by_idx(self.plan.predefined_team_idx)
+            if team is None:
+                return self.round_fail('预备编队配置不存在')
+            strategy = team.auto_battle
+        battle.init_auto_op(op_name=strategy, sub_dir='auto_battle')
         if battle.auto_op is None or battle.auto_op.auto_turn_interval != 0:
             return self.round_fail('Mac 自动战斗策略须关闭尚未校准的自动转向')
         return self.round_success()
@@ -168,6 +176,16 @@ class GamepadCombatSimulation(ZOperation):
     def prepare_deployment(self) -> OperationRoundResult:
         """核对实际预设后只按一次 Start，后续轮次等待编队画面。"""
         if self._deployment_visible():
+            if self.plan.predefined_team_idx >= 0 and not self._team_prepared:
+                from zzz_od.operation.gamepad.predefined_team import (
+                    GamepadChoosePredefinedTeam,
+                )
+
+                result = GamepadChoosePredefinedTeam(self.ctx, self.plan.predefined_team_idx).execute()
+                if not result.success:
+                    return self.round_by_op_result(result)
+                self._team_prepared = True
+                return self.round_retry('已选择配置编队，等待准备页面更新', wait=0.5)
             charge = self._charge()
             if charge is None:
                 return self.round_retry('未能确认编队页实际电量', wait=1)
