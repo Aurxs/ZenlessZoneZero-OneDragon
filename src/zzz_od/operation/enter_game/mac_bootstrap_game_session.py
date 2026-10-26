@@ -188,6 +188,11 @@ class MacBootstrapGameSession(Operation):
         if self._area_found('大世界-触屏操作') and self._area_found('大世界-菜单'):
             return self._send_action('打开触屏菜单', area_name='大世界-菜单')
 
+        if self._area_found('快捷手册-触屏关闭') and all(
+            self._has_text('快捷手册-顶部标签', text) for text in ('目标', '日常', '训练')
+        ):
+            return self._send_action('关闭触屏快捷手册', area_name='快捷手册-触屏关闭')
+
         login_result = self._prepare_login()
         if login_result is not None:
             return login_result
