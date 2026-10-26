@@ -21,3 +21,10 @@ added_areas:
   - 975
   - 1310
   - 1060
+- area_name: 手柄-任务领取
+  area_type: none
+  pc_rect:
+  - 1100
+  - 790
+  - 1410
+  - 935

@@ -1,8 +1,10 @@
+import sys
+
 from cv2.typing import MatLike
 
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
-from one_dragon.base.operation.operation_notify import node_notify, NotifyTiming
+from one_dragon.base.operation.operation_notify import NotifyTiming, node_notify
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
 from zzz_od.application.ridu_weekly import ridu_weekly_const
 from zzz_od.application.zzz_application import ZApplication
@@ -22,7 +24,22 @@ class RiduWeeklyApp(ZApplication):
             op_name=ridu_weekly_const.APP_NAME,
         )
 
-    @operation_node(name='返回大世界', is_start_node=True)
+    @operation_node(name='选择输入方式', is_start_node=True)
+    def choose_input_mode(self) -> OperationRoundResult:
+        """Mac 使用手柄分支，其他平台保留原领奖流程。"""
+        return self.round_success('手柄丽都周纪' if sys.platform == 'darwin' else None)
+
+    @node_from(from_name='选择输入方式', status='手柄丽都周纪')
+    @node_notify(when=NotifyTiming.CURRENT_DONE)
+    @operation_node(name='手柄丽都周纪')
+    def run_gamepad_rewards(self) -> OperationRoundResult:
+        """复用原应用与运行记录，不进入 PC 坐标点击。"""
+        from zzz_od.operation.gamepad.rewards_weekly import GamepadRiduWeekly
+
+        return self.round_by_op_result(GamepadRiduWeekly(self.ctx).execute())
+
+    @node_from(from_name='选择输入方式')
+    @operation_node(name='返回大世界')
     def back_at_first(self) -> OperationRoundResult:
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())

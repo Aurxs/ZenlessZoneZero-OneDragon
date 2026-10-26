@@ -22,7 +22,7 @@ MACOS_CHARGE_PLAN_LIMITS: str = (
     '每场核对实际消耗20或100电量，不自动补电量'
 )
 MACOS_APP_SUMMARY: str = (
-    'Mac 已支持阿朔占卜、录像店、汀曼咖啡、体力计划、活跃度奖励和丽都城募；'
+    'Mac 已支持阿朔占卜、录像店、汀曼咖啡、体力计划、活跃度奖励、丽都周纪和丽都城募；'
     '其余任务以卡片上的适配提示为准'
 )
 MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
@@ -33,6 +33,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     city_fund_const.APP_ID,
     engagement_reward_const.APP_ID,
     'daily_signin',
+    'ridu_weekly',
 })
 
 
@@ -40,6 +41,7 @@ def get_macos_app_limits(app_id: str) -> str:
     """让每个任务显示自身范围，避免商店按钮误显示战斗限制。"""
     return {
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
+        'ridu_weekly': 'Mac 支持领取已完成九宫格积分与积分特赏，不代做周任务',
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,
         random_play_const.APP_ID: 'Mac 支持澄辉坪营业点、随机或已选宣传员和推荐上架；指定人物移焦尚未支持',
         coffee_app_const.APP_ID: 'Mac 已验证澄辉坪汀曼特调与今日已喝；其他入口和额外咖啡尚未实测',
@@ -52,10 +54,7 @@ def get_macos_app_unavailable_reason(app_id: str) -> str | None:
     """只限制 Mac 运行，不更改应用注册、顺序与启用状态。"""
     if sys.platform != 'darwin' or app_id in MACOS_SUPPORTED_APP_IDS:
         return None
-    reasons = {
-        'ridu_weekly': 'Mac 周纪导航已通过，九宫格可领积分的手柄操作尚待适配',
-    }
-    return reasons.get(app_id, 'Mac暂未适配，此应用仍可查看和配置')
+    return 'Mac暂未适配，此应用仍可查看和配置'
 
 
 def get_macos_one_dragon_unavailable_reason(ctx: ZContext) -> str | None:
