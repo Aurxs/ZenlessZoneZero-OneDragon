@@ -36,9 +36,10 @@ def simulation_targets() -> dict[str, tuple[str, ...]]:
 
 def read_preset_area(
     ctx: ZContext, screen: MatLike | None, area_name: str,
+    screen_name: str = '实战模拟室',
 ) -> tuple[MatLike, dict[str, MatchResultList]] | None:
     """读取平台模拟室区域，缺少截图或配置时不产生输入。"""
-    area = ctx.screen_loader.get_area('实战模拟室', area_name)
+    area = ctx.screen_loader.get_area(screen_name, area_name)
     if area is None or screen is None:
         return None
     rect = area.rect
@@ -63,17 +64,18 @@ def read_preset_charge(ctx: ZContext, screen: MatLike | None) -> tuple[int, int]
 
 def read_focused_choice(
     ctx: ZContext, screen: MatLike | None, area_name: str, names: tuple[str, ...],
+    screen_name: str = '实战模拟室', border_gap: int = 5,
 ) -> tuple[str | None, set[str]]:
     """一次 OCR 匹配名称和完整黄框，同时返回可见目标。"""
-    area = read_preset_area(ctx, screen, area_name)
+    area = read_preset_area(ctx, screen, area_name, screen_name)
     if area is None:
         return None, set()
     image, results = area
     visible = {text.replace(' ', '') for text in results} & set(names)
-    # 压缩和 NEW 标记可在细边框上留下小断口，只闭合五像素内的缝隙。
+    # 压缩、NEW 标记和翻页箭头会遮挡边框；按页面实际缺口闭合。
     mask = cv2.morphologyEx(
         highlight_mask(image, 'yellow'), cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)),
+        cv2.getStructuringElement(cv2.MORPH_RECT, (border_gap, border_gap)),
     )
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     selected: set[str] = set()

@@ -274,9 +274,13 @@ class GamepadCombatSimulation(GamepadOperation):
         battle = self.ctx.auto_battle_context
         self.ctx.controller.begin_battle_input_scope(MacBattleHudGuard(battle))
         self._gate_active = True
+        self.move_to_battle()
         battle.start_auto_battle()
         self._battle_active = True
         return self.round_success()
+
+    def move_to_battle(self) -> None:
+        """模拟室原地开始；其他普通副本可在输入保护内复用原接敌动作。"""
 
     @node_from(from_name='启动既有自动战斗')
     @operation_node(name='自动战斗', mute=True, timeout_seconds=180)

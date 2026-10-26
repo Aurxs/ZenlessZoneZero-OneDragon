@@ -1,0 +1,34 @@
+screen_id: area_patrol
+added_areas:
+- area_name: 手柄-挑战等级
+  area_type: text
+  pc_rect:
+  - 1400
+  - 15
+  - 1570
+  - 90
+  text: 挑战等级
+  lcs_percent: 0.8
+- area_name: 手柄-下一步
+  area_type: text
+  pc_rect:
+  - 1650
+  - 990
+  - 1790
+  - 1065
+  text: 下一步
+  lcs_percent: 0.8
+- area_name: 手柄-副本标题
+  area_type: none
+  pc_rect:
+  - 820
+  - 160
+  - 1410
+  - 275
+- area_name: 手柄-副本列表
+  area_type: none
+  pc_rect:
+  - 100
+  - 700
+  - 1820
+  - 900
