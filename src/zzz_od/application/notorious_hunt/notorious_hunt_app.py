@@ -1,3 +1,4 @@
+import sys
 from typing import ClassVar
 
 from one_dragon.base.operation.application import application_const
@@ -59,6 +60,12 @@ class NotoriousHuntApp(ZApplication):
 
     @operation_node(name='开始恶名狩猎', is_start_node=True)
     def start_hunt(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.notorious_hunt import validate_macos_hunt_plan
+
+            reason = validate_macos_hunt_plan(self.config.plan_list)
+            if reason is not None:
+                return self.round_fail(reason)
         # 每轮开始复位游标并清空本轮跳过标记
         self.last_tried_plan = None
         for plan in self.config.plan_list:
@@ -89,12 +96,20 @@ class NotoriousHuntApp(ZApplication):
     @node_from(from_name='查找下一条计划')
     @operation_node(name='前往大世界')  # 特训目标查找失败可能把快捷手册列表滑到底部，返回大世界后重置列表位置
     def back_before_open_compendium(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.notorious_hunt import GamepadHuntBackToWorld
+
+            return self.round_by_op_result(GamepadHuntBackToWorld(self.ctx).execute())
         op = BackToNormalWorld(self.ctx, ensure_normal_world=True)
         return self.round_by_op_result(op.execute())
 
     @node_from(from_name='前往大世界')
     @operation_node(name='传送')
     def transport(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.notorious_hunt import GamepadHuntTransport
+
+            return self.round_by_op_result(GamepadHuntTransport(self.ctx, self.next_plan.mission_type_name).execute())
         op = TransportByCompendium(self.ctx,
                                    self.next_plan.tab_name,
                                    self.next_plan.category_name,
@@ -113,6 +128,10 @@ class NotoriousHuntApp(ZApplication):
     @node_from(from_name='传送')
     @operation_node(name='恶名狩猎')
     def notorious_hunt(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.notorious_hunt import GamepadNotoriousHunt
+
+            return self.round_by_op_result(GamepadNotoriousHunt(self.ctx, self.next_plan).execute())
         op = NotoriousHunt(self.ctx, self.next_plan, use_charge_power=False)
         return self.round_by_op_result(op.execute())
 
@@ -120,6 +139,8 @@ class NotoriousHuntApp(ZApplication):
     @node_from(from_name='恶名狩猎', success=False)
     @operation_node(name='判断剩余次数')
     def check_left_times(self) -> OperationRoundResult:
+        if sys.platform == 'darwin' and not self.previous_node.is_success:
+            return self.round_fail(self.previous_node.status or '恶名狩猎挑战未完成')
         if self.run_record.left_times == 0:
             return self.round_success(NotoriousHunt.STATUS_NO_LEFT_TIMES)
 
@@ -138,6 +159,8 @@ class NotoriousHuntApp(ZApplication):
     @node_from(from_name='查找下一条计划', status=STATUS_ROUND_FINISHED)
     @operation_node(name='点击奖励入口')
     def click_reward_entry(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         return self.round_by_click_area(
             '恶名狩猎', '奖励入口',
             success_wait=1, retry_wait=1
@@ -147,6 +170,12 @@ class NotoriousHuntApp(ZApplication):
     @node_notify(when=NotifyTiming.CURRENT_DONE)
     @operation_node(name='全部领取', node_max_retry_times=2)
     def claim_all(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.notorious_hunt_rewards import (
+                GamepadHuntRewards,
+            )
+
+            return self.round_by_op_result(GamepadHuntRewards(self.ctx).execute())
         return self.round_by_find_and_click_area(
             self.last_screenshot, '恶名狩猎', '全部领取',
             success_wait=1, retry_wait=0.5
@@ -157,5 +186,15 @@ class NotoriousHuntApp(ZApplication):
     @node_from(from_name='全部领取', success=False)
     @operation_node(name='返回大世界')
     def back_to_world(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.notorious_hunt import GamepadHuntBackToWorld
+
+            failure = None
+            if not self.previous_node.is_success:
+                failure = self.previous_node.status or '周期奖励领取未完成'
+            result = GamepadHuntBackToWorld(self.ctx).execute()
+            if result.success and failure is not None:
+                return self.round_fail(failure)
+            return self.round_by_op_result(result)
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())

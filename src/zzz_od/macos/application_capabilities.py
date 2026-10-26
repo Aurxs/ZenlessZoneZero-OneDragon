@@ -23,7 +23,7 @@ MACOS_CHARGE_PLAN_LIMITS: str = (
 )
 MACOS_APP_SUMMARY: str = (
     'Mac 已支持阿朔占卜、录像店、汀曼咖啡、体力计划、活跃度奖励、丽都周纪和丽都城募；'
-    '其余任务以卡片上的适配提示为准'
+    '恶名狩猎已支持库萨里库，其他任务以卡片上的适配提示为准'
 )
 MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     application_const.ONE_DRAGON_APP_ID,
@@ -34,6 +34,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     engagement_reward_const.APP_ID,
     'daily_signin',
     'ridu_weekly',
+    'notorious_hunt',
 })
 
 
@@ -41,6 +42,7 @@ def get_macos_app_limits(app_id: str) -> str:
     """让每个任务显示自身范围，避免商店按钮误显示战斗限制。"""
     return {
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
+        'notorious_hunt': 'Mac 已验证库萨里库免费挑战、GUI 难度与编队、周期领奖；其他 Boss 和深度追猎尚未开放',
         'ridu_weekly': 'Mac 支持领取已完成九宫格积分与积分特赏，不代做周任务',
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,
         random_play_const.APP_ID: 'Mac 支持澄辉坪营业点、随机或已选宣传员和推荐上架；指定人物移焦尚未支持',
