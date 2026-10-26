@@ -10,6 +10,8 @@ from one_dragon.base.operation.application.application_config import Application
 from zzz_od.application.charge_plan.charge_plan_config import ChargePlanItem
 from zzz_od.application.notorious_hunt import notorious_hunt_const
 
+MACOS_HIGHEST_LEVEL: str = '最高可用等级'
+
 
 class NotoriousHuntLevelEnum(Enum):
 

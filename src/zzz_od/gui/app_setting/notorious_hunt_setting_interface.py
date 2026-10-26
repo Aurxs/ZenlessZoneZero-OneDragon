@@ -1,3 +1,5 @@
+import sys
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget
 from qfluentwidgets import (
@@ -34,6 +36,7 @@ from zzz_od.application.battle_assistant.auto_battle_config import (
 from zzz_od.application.charge_plan.charge_plan_config import ChargePlanItem
 from zzz_od.application.notorious_hunt import notorious_hunt_const
 from zzz_od.application.notorious_hunt.notorious_hunt_config import (
+    MACOS_HIGHEST_LEVEL,
     NotoriousHuntBuffEnum,
     NotoriousHuntConfig,
     NotoriousHuntLevelEnum,
@@ -143,7 +146,12 @@ class NotoriousHuntCard(DraggableListItem):
 
     def init_level_combo_box(self) -> None:
         config_list = [i.value for i in NotoriousHuntLevelEnum]
-        self.level_combo_box.set_items(config_list, self.plan.level)
+        selected = self.plan.level
+        if sys.platform == 'darwin':
+            config_list = [ConfigItem(MACOS_HIGHEST_LEVEL)] + config_list[1:]
+            if selected == '默认等级':
+                selected = MACOS_HIGHEST_LEVEL
+        self.level_combo_box.set_items(config_list, selected)
 
     def init_buff_combo_box(self) -> None:
         config_list = [i.value for i in NotoriousHuntBuffEnum]
@@ -350,7 +358,7 @@ class NotoriousHuntDialog(MessageBoxBase):
             category_name='恶名狩猎',
             mission_type_name='初生死路屠夫',
             mission_name=None,
-            level='默认等级',
+            level=MACOS_HIGHEST_LEVEL if sys.platform == 'darwin' else '默认等级',
             auto_battle_config='全配队通用',
             run_times=0,
             plan_times=1,
