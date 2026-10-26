@@ -1,0 +1,41 @@
+screen_id: expert_challenge
+added_areas:
+- area_name: 手柄-挑战等级
+  area_type: text
+  pc_rect:
+  - 1400
+  - 15
+  - 1570
+  - 90
+  text: 挑战等级
+  lcs_percent: 0.8
+- area_name: 手柄-下一步
+  area_type: text
+  pc_rect:
+  - 1670
+  - 990
+  - 1805
+  - 1065
+  text: 下一步
+  lcs_percent: 0.8
+- area_name: 手柄-副本标题
+  area_type: none
+  pc_rect:
+  - 730
+  - 175
+  - 1400
+  - 265
+- area_name: 手柄-底部模式
+  area_type: none
+  pc_rect:
+  - 0
+  - 960
+  - 1000
+  - 1080
+- area_name: 手柄-副本列表
+  area_type: none
+  pc_rect:
+  - 100
+  - 185
+  - 1840
+  - 910

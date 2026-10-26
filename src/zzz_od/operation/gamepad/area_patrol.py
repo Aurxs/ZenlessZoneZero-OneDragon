@@ -31,15 +31,17 @@ class GamepadChargeBackToWorld(GamepadOperation):
         self.category_name: str = category_name
         self._deployment_back_sent: bool = False
         self._detail_back_sent: bool = False
+        self._list_back_sent: bool = False
 
     def handle_init(self) -> None:
         self._deployment_back_sent = False
         self._detail_back_sent = False
+        self._list_back_sent = False
 
     @operation_node(name='返回副本大世界', is_start_node=True, node_max_retry_times=30)
     def back(self) -> OperationRoundResult:
         """每个已确认页面只发送一次返回，并等待下一页。"""
-        if self.category_name not in ('区域巡防',):
+        if self.category_name not in ('区域巡防', '专业挑战室'):
             return self.round_fail('未适配的副本返回分类')
         if self.last_screenshot is None:
             return self.round_retry('等待截图', wait=1)
@@ -55,6 +57,13 @@ class GamepadChargeBackToWorld(GamepadOperation):
                 self.ctx.controller.btn_tap('east')
                 self._detail_back_sent = True
             return self.round_retry('等待大世界', wait=1)
+        if self.category_name == '专业挑战室':
+            selected, _ = read_focused_choice(self.ctx, self.last_screenshot, '手柄-副本列表', charge_mission_names('专业挑战室'), '专业挑战室')
+            if selected is not None:
+                if not self._list_back_sent:
+                    self.ctx.controller.btn_tap('east')
+                    self._list_back_sent = True
+                return self.round_retry('等待专业挑战室列表退出', wait=1)
         if self.node_retry_times >= 15:
             self.save_screenshot(prefix='macos_charge_exit_pending')
         return self.round_retry('等待已建档的副本返回画面', wait=1)

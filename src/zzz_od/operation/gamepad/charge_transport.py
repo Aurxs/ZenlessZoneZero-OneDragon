@@ -61,7 +61,7 @@ class GamepadChargeTransport(GamepadOperation):
     @operation_node(name='检查副本目标', is_start_node=True, screenshot_before_round=False)
     def check_target(self) -> OperationRoundResult:
         """普通副本从原数据取名，特训目标另行适配。"""
-        if self.category_name not in ('区域巡防',):
+        if self.category_name not in ('区域巡防', '专业挑战室'):
             return self.round_fail(f'尚未开放手册分类：{self.category_name}')
         self._names = charge_mission_names(self.category_name)
         if self.target not in self._names:

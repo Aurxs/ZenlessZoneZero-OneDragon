@@ -20,6 +20,7 @@ from zzz_od.operation.gamepad.charge_transport import (
 )
 from zzz_od.operation.gamepad.combat_simulation import GamepadCombatSimulation
 from zzz_od.operation.gamepad.configure_cards import GamepadConfigureCards
+from zzz_od.operation.gamepad.expert_challenge import GamepadExpertChallenge
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
 from zzz_od.operation.gamepad.simulation_preset import (
     SIMULATION_TYPES,
@@ -49,7 +50,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
         return 'Mac 体力计划尚不支持双倍活动临时计划，请关闭双倍活动'
     supported: dict[str, tuple[str | int, ...]] = {
         'tab_name': ('训练',),
-        'category_name': ('实战模拟室', '区域巡防'),
+        'category_name': ('实战模拟室', '区域巡防', '专业挑战室'),
         'mission_type_name': SIMULATION_TYPES,
         'level': ('默认等级',),
         'card_num': (CardNumEnum.DEFAULT.value.value, '1', '2', '3', '4', '5'),
@@ -66,17 +67,17 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
     }
     for index, plan in enumerate(config.plan_list, start=1):
         for field, values in supported.items():
-            if plan.category_name == '区域巡防' and field in ('mission_type_name', 'card_num'):
+            if plan.category_name in ('区域巡防', '专业挑战室') and field in ('mission_type_name', 'card_num'):
                 continue
             value = getattr(plan, field)
             if value not in values:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
                     '目前仅支持训练/实战模拟室/基础/晋升/音擎改装/技能材料、默认等级、'
-                    '默认五卡、1至5张卡片，或区域巡防普通副本；当前编队或前六个预备编队'
+                    '默认五卡、1至5张卡片，或区域巡防/专业挑战室普通副本；当前编队或前六个预备编队'
                 )
-        if plan.category_name == '区域巡防' and plan.mission_type_name not in charge_mission_names('区域巡防'):
-            return f'Mac 体力计划第 {index} 项的巡防副本不在原数据中'
+        if plan.category_name in ('区域巡防', '专业挑战室') and plan.mission_type_name not in charge_mission_names(plan.category_name):
+            return f'Mac 体力计划第 {index} 项的副本“{plan.category_name}/{plan.mission_type_name}”不在原数据中'
         if plan.category_name == '实战模拟室' and plan.mission_name not in simulation_targets().get(plan.mission_type_name, ()):
             return f'Mac 体力计划第 {index} 项的专项“{plan.mission_type_name}/{plan.mission_name}”不在原副本数据中'
         if plan.plan_times <= 0 or plan.run_times < 0:
@@ -119,7 +120,7 @@ class GamepadChargePlan(GamepadOperation):
 
     def _found(self, area_name: str) -> bool:
         """只读取实战模拟室锚点，不产生输入。"""
-        screen_name = '区域巡防' if self.current_plan is not None and self.current_plan.category_name == '区域巡防' and area_name in ('手柄-挑战等级', '手柄-下一步') else '实战模拟室'
+        screen_name = self.current_plan.category_name if self.current_plan is not None and self.current_plan.category_name in ('区域巡防', '专业挑战室') and area_name in ('手柄-挑战等级', '手柄-下一步') else '实战模拟室'
         return self.last_screenshot is not None and self.round_by_find_area(
             self.last_screenshot, screen_name, area_name
         ).is_success
@@ -154,7 +155,7 @@ class GamepadChargePlan(GamepadOperation):
             return self.round_success(self.STATUS_FINISHED)
         self._preset_back_sent = False
         self._category_back_sent = False
-        operation_class = GamepadAreaPatrol if self.current_plan.category_name == '区域巡防' else GamepadCombatSimulation
+        operation_class = {'区域巡防': GamepadAreaPatrol, '专业挑战室': GamepadExpertChallenge}.get(self.current_plan.category_name, GamepadCombatSimulation)
         self._simulation = operation_class(
             self.ctx, self.current_plan, config=self.config
         )
@@ -166,8 +167,8 @@ class GamepadChargePlan(GamepadOperation):
         """共用已验证的基础材料入口，随后按计划切换实际分类和专项。"""
         if self.current_plan is None:
             return self.round_fail('尚未选择体力计划')
-        if self.current_plan.category_name == '区域巡防':
-            return self.round_by_op_result(GamepadChargeTransport(self.ctx, '区域巡防', self.current_plan.mission_type_name).execute())
+        if self.current_plan.category_name in ('区域巡防', '专业挑战室'):
+            return self.round_by_op_result(GamepadChargeTransport(self.ctx, self.current_plan.category_name, self.current_plan.mission_type_name).execute())
         if self._found('手柄-挑战等级') and self._found('手柄-下一步'):
             return self.round_success('已在模拟室预设，继续核对卡片与电量')
         op = GamepadTransportByCompendium(
@@ -182,8 +183,8 @@ class GamepadChargePlan(GamepadOperation):
         """先把计划数量落实到预设，不将旧预设消耗用于判断本次是否足够。"""
         if self._simulation is None or self.current_plan is None:
             return self.round_fail('尚未创建单次挑战')
-        if self.current_plan.category_name == '区域巡防':
-            return self.round_success('区域巡防无需编辑卡片')
+        if self.current_plan.category_name in ('区域巡防', '专业挑战室'):
+            return self.round_success('当前副本无需编辑卡片')
         return self.round_by_op_result(
             GamepadConfigureCards(self.ctx, self._simulation.expected_card_count, self.current_plan.mission_name, self.current_plan.mission_type_name).execute()
         )
@@ -244,15 +245,17 @@ class GamepadChargePlan(GamepadOperation):
             if self.config.skip_plan and self.current_plan is not None and self.current_charge is not None:
                 following = self.config.get_next_plan(self.current_plan)
                 while following is not None:
-                    required = 60 if following.category_name == '区域巡防' else (100 if following.card_num == CardNumEnum.DEFAULT.value.value else int(following.card_num) * 20)
+                    required = {'区域巡防': 60, '专业挑战室': 40}.get(following.category_name)
+                    if required is None:
+                        required = 100 if following.card_num == CardNumEnum.DEFAULT.value.value else int(following.card_num) * 20
                     if self.current_charge >= required:
                         self.current_plan.skipped = True
                         return self.round_success(self.STATUS_TRY_NEXT_PLAN)
                     following.skipped = True
                     following = self.config.get_next_plan(following)
             return self._summary('电量不足，未完成计划保留')
-        if self.current_plan is not None and self.current_plan.category_name == '区域巡防':
-            result = GamepadChargeBackToWorld(self.ctx, '区域巡防').execute()
+        if self.current_plan is not None and self.current_plan.category_name in ('区域巡防', '专业挑战室'):
+            result = GamepadChargeBackToWorld(self.ctx, self.current_plan.category_name).execute()
             if not result.success:
                 return self.round_by_op_result(result)
             return self.round_retry('已返回大世界，检查后续计划', wait=0.5)
