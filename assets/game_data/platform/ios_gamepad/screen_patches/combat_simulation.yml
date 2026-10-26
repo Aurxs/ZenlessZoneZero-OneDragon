@@ -12,10 +12,10 @@ added_areas:
 - area_name: 手柄-下一步
   area_type: text
   pc_rect:
-  - 1620
-  - 980
-  - 1845
-  - 1055
+  - 1450
+  - 970
+  - 1910
+  - 1080
   text: 下一步
   lcs_percent: 0.8
 - area_name: 手柄-预设列表

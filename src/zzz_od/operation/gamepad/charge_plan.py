@@ -71,6 +71,7 @@ class GamepadChargePlan(ZOperation):
     """每场配置后核对实际二十或一百电量，胜利次数沿用原配置保存。"""
 
     STATUS_FINISHED: ClassVar[str] = '体力计划结束'
+    STATUS_TRY_NEXT_PLAN: ClassVar[str] = '继续后续可执行计划'
     STATUS_CHARGE_NOT_ENOUGH: ClassVar[str] = GamepadCombatSimulation.STATUS_CHARGE_NOT_ENOUGH
 
     def __init__(
@@ -117,6 +118,7 @@ class GamepadChargePlan(ZOperation):
         )
 
     @node_from(from_name='执行单次挑战')
+    @node_from(from_name='电量不足返回大世界', status=STATUS_TRY_NEXT_PLAN)
     @operation_node(name='选择原体力计划', is_start_node=True, screenshot_before_round=False)
     def select_plan(self) -> OperationRoundResult:
         """沿用原计划顺序和循环扣减，不为凑电量改任务。"""
@@ -132,6 +134,8 @@ class GamepadChargePlan(ZOperation):
         self.current_plan = self.config.get_next_plan()
         if self.current_plan is None:
             return self.round_success(self.STATUS_FINISHED)
+        self._preset_back_sent = False
+        self._category_back_sent = False
         self._simulation = GamepadCombatSimulation(
             self.ctx, self.current_plan, config=self.config
         )
@@ -143,6 +147,8 @@ class GamepadChargePlan(ZOperation):
         """每场完成后从大世界重新导航，沿用已验证的单次路径。"""
         if self.current_plan is None:
             return self.round_fail('尚未选择体力计划')
+        if self._found('手柄-挑战等级') and self._found('手柄-下一步'):
+            return self.round_success('已在模拟室预设，继续核对卡片与电量')
         op = GamepadTransportByCompendium(
             self.ctx, self.current_plan.tab_name,
             self.current_plan.category_name, self.current_plan.mission_type_name,
@@ -204,12 +210,19 @@ class GamepadChargePlan(ZOperation):
     @node_from(from_name='执行单次挑战', success=False, status=STATUS_CHARGE_NOT_ENOUGH)
     @operation_node(name='电量不足返回大世界', node_max_retry_times=15, timeout_seconds=20)
     def return_after_shortage(self) -> OperationRoundResult:
-        """当前计划电量不足时结束并保留次数，不自动恢复或更换计划。"""
+        """电量不足时保留次数，按原跳过配置尝试后续计划，不自动补电。"""
         if self.last_screenshot is None:
             return self.round_retry('截图无效', wait=1)
         if self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册'
         ).is_success:
+            if self.config.skip_plan and self.current_plan is not None and self.current_charge is not None:
+                following = self.config.get_next_plan(self.current_plan)
+                if following is not None:
+                    required = 20 if following.card_num == '1' else 100
+                    if self.current_charge >= required:
+                        self.current_plan.skipped = True
+                        return self.round_success(self.STATUS_TRY_NEXT_PLAN)
             return self._summary('电量不足，未完成计划保留')
         if self._found('手柄-挑战等级') and self._found('手柄-下一步'):
             if not self._preset_back_sent:
