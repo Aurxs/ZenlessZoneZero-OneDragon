@@ -56,7 +56,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
         'mission_type_name': SIMULATION_TYPES,
         'level': ('默认等级',),
         'card_num': (CardNumEnum.DEFAULT.value.value, '1', '2', '3', '4', '5'),
-        'predefined_team_idx': tuple(range(-1, 6)),
+        'predefined_team_idx': tuple(range(-1, 20)),
     }
     labels: dict[str, str] = {
         'tab_name': '标签页',
@@ -76,7 +76,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
                     '目前仅支持训练/实战模拟室/基础/晋升/音擎改装/技能材料、默认等级、'
-                    '默认保留已保存数量、1至5张卡片，或区域巡防/专业挑战室普通副本；当前编队或前六个预备编队'
+                    '默认保留已保存数量、1至5张卡片，或区域巡防/专业挑战室普通副本；当前编队或二十个预备编队'
                 )
         if plan.category_name in ('区域巡防', '专业挑战室', '恶名狩猎') and plan.mission_type_name not in charge_mission_names(plan.category_name):
             return f'Mac 体力计划第 {index} 项的副本“{plan.category_name}/{plan.mission_type_name}”不在原数据中'

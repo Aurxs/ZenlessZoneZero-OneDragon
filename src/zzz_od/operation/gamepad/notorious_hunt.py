@@ -35,8 +35,8 @@ def validate_macos_hunt_plan(plans: list[ChargePlanItem]) -> str | None:
     for plan in plans:
         if plan.category_name != '恶名狩猎' or plan.mission_type_name != '库萨里库':
             return 'Mac 恶名狩猎当前仅实测库萨里库；其他 Boss 尚未适配'
-        if plan.predefined_team_idx not in range(-1, 6):
-            return 'Mac 暂支持当前编队或前六个预备编队'
+        if plan.predefined_team_idx not in range(-1, 20):
+            return 'Mac 暂支持当前编队或二十个预备编队'
         if plan.plan_times <= 0 or plan.run_times < 0:
             return '恶名狩猎计划次数必须大于零，已完成次数不能为负'
     return None
@@ -196,7 +196,7 @@ class GamepadHuntPrepare(GamepadOperation):
 
     def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
         """明确目标和难度，不把未知剩余次数当作免费机会。"""
-        super().__init__(ctx, op_name='手柄恶名狩猎出战准备', timeout_seconds=90)
+        super().__init__(ctx, op_name='手柄恶名狩猎出战准备', timeout_seconds=220)
         self.plan: ChargePlanItem = plan
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(
             ctx, '训练', '恶名狩猎', plan.mission_type_name,
@@ -220,8 +220,8 @@ class GamepadHuntPrepare(GamepadOperation):
     @operation_node(name='核对挑战目标', is_start_node=True, node_max_retry_times=4)
     def check_target(self) -> OperationRoundResult:
         """当前编队以外的能力暂不静默忽略。"""
-        if self.plan.predefined_team_idx not in range(-1, 6):
-            return self.round_fail('Mac 恶名狩猎暂支持当前编队或前六个预备编队')
+        if self.plan.predefined_team_idx not in range(-1, 20):
+            return self.round_fail('Mac 恶名狩猎暂支持当前编队或二十个预备编队')
         self.navigation.last_screenshot = self.last_screenshot
         area = self.navigation._read_area('恶名狩猎', '手柄-页面文字')
         if area is None:
@@ -285,7 +285,7 @@ class GamepadHuntPrepare(GamepadOperation):
         return self.round_retry('等待明确的等级焦点', wait=0.5)
 
     @node_from(from_name='选择计划难度')
-    @operation_node(name='进入当前编队', node_max_retry_times=8, timeout_seconds=60)
+    @operation_node(name='进入当前编队', node_max_retry_times=8, timeout_seconds=180)
     def prepare_deployment(self) -> OperationRoundResult:
         """确认出战和预备编队出现后结束准备，不发送出战键。"""
         if self.last_screenshot is not None and all(

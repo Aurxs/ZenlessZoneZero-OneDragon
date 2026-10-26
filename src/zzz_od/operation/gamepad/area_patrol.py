@@ -41,7 +41,7 @@ class GamepadChargeBackToWorld(GamepadOperation):
     @operation_node(name='返回副本大世界', is_start_node=True, node_max_retry_times=30)
     def back(self) -> OperationRoundResult:
         """每个已确认页面只发送一次返回，并等待下一页。"""
-        if self.category_name not in ('区域巡防', '专业挑战室'):
+        if self.category_name not in ('实战模拟室', '区域巡防', '专业挑战室'):
             return self.round_fail('未适配的副本返回分类')
         if self.last_screenshot is None:
             return self.round_retry('等待截图', wait=1)
@@ -57,6 +57,14 @@ class GamepadChargeBackToWorld(GamepadOperation):
                 self.ctx.controller.btn_tap('east')
                 self._detail_back_sent = True
             return self.round_retry('等待大世界', wait=1)
+        if self.category_name == '实战模拟室' and all(
+            self.round_by_find_area(self.last_screenshot, '实战模拟室', name).is_success
+            for name in ('手柄-基础材料分类', '手柄-代理人晋升分类')
+        ):
+            if not self._list_back_sent:
+                self.ctx.controller.btn_tap('east')
+                self._list_back_sent = True
+            return self.round_retry('等待模拟室分类页退出', wait=1)
         if self.category_name == '专业挑战室':
             selected, _ = read_focused_choice(self.ctx, self.last_screenshot, '手柄-副本列表', charge_mission_names('专业挑战室'), '专业挑战室')
             if selected is not None:
@@ -101,8 +109,8 @@ class GamepadAreaPatrol(GamepadCombatSimulation):
         """只接受原数据中的普通巡防副本，不将特训目标当普通关卡。"""
         if self.plan.tab_name != '训练' or self.plan.category_name != '区域巡防' or self.plan.mission_type_name not in charge_mission_names('区域巡防'):
             return self.round_fail('区域巡防目标不在已支持的原副本数据中')
-        if self.plan.level != '默认等级' or self.plan.predefined_team_idx not in range(-1, 6):
-            return self.round_fail('区域巡防暂支持默认等级与当前编队或前六个预备编队')
+        if self.plan.level != '默认等级' or self.plan.predefined_team_idx not in range(-1, 20):
+            return self.round_fail('区域巡防暂支持默认等级与当前编队或二十个预备编队')
         if self.plan.plan_times <= 0 or self.plan.run_times < 0 or self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('计划次数无效或已完成')
         return self.round_success()

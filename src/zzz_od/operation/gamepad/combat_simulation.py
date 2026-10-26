@@ -156,9 +156,9 @@ class GamepadCombatSimulation(GamepadOperation):
             or self.plan.mission_name not in simulation_targets().get(self.plan.mission_type_name, ())
             or self.plan.level != '默认等级'
             or self.plan.card_num not in (CardNumEnum.DEFAULT.value.value, '1', '2', '3', '4', '5')
-            or self.plan.predefined_team_idx not in range(-1, 6)
+            or self.plan.predefined_team_idx not in range(-1, 20)
         ):
-            return self.round_fail('手柄实战模拟室支持基础、晋升、音擎改装、技能材料1至5张卡片、默认等级与当前编队或前六个预备编队')
+            return self.round_fail('手柄实战模拟室支持基础、晋升、音擎改装、技能材料1至5张卡片、默认等级与当前编队或二十个预备编队')
         if self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('当前计划已完成')
         return self.round_success()
@@ -204,7 +204,7 @@ class GamepadCombatSimulation(GamepadOperation):
         return self.round_by_op_result(result)
 
     @node_from(from_name='配置挑战卡片')
-    @operation_node(name='准备当前编队', node_max_retry_times=10, timeout_seconds=75)
+    @operation_node(name='准备当前编队', node_max_retry_times=10, timeout_seconds=180)
     def prepare_deployment(self) -> OperationRoundResult:
         """核对实际预设后只按一次 Start，后续轮次等待编队画面。"""
         if self._deployment_visible():

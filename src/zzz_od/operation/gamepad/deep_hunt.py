@@ -107,8 +107,8 @@ class GamepadDeepHuntPrepare(GamepadHuntPrepare):
     @operation_node(name='核对挑战目标', is_start_node=True, node_max_retry_times=4)
     def check_target(self) -> OperationRoundResult:
         """未确认目标及模式不进入编队。"""
-        if self.plan.predefined_team_idx not in range(-1, 6):
-            return self.round_fail('暂支持当前编队或前六个预备编队')
+        if self.plan.predefined_team_idx not in range(-1, 20):
+            return self.round_fail('暂支持当前编队或二十个预备编队')
         if not deep_target_selected(self.ctx, self.last_screenshot, self.plan.mission_type_name):
             return self.round_fail('深度追猎目标或模式与计划不一致')
         charge = read_preset_charge(self.ctx, self.last_screenshot)
@@ -127,7 +127,7 @@ class GamepadDeepHuntPrepare(GamepadHuntPrepare):
         return super().choose_level()
 
     @node_from(from_name='选择计划难度')
-    @operation_node(name='进入当前编队', node_max_retry_times=10, timeout_seconds=75)
+    @operation_node(name='进入当前编队', node_max_retry_times=10, timeout_seconds=180)
     def prepare_deployment(self) -> OperationRoundResult:
         """出战页再次读取真实60消耗，不靠预估跳过检查。"""
         charge = read_preset_charge(self.ctx, self.last_screenshot)
@@ -172,7 +172,7 @@ class GamepadDeepHunt(GamepadNotoriousHunt):
     def _preset_selected(self) -> bool:
         return deep_target_selected(self.ctx, self.last_screenshot, self.plan.mission_type_name)
 
-    @operation_node(name='准备挑战', is_start_node=True, screenshot_before_round=False, timeout_seconds=180)
+    @operation_node(name='准备挑战', is_start_node=True, screenshot_before_round=False, timeout_seconds=260)
     def prepare(self) -> OperationRoundResult:
         if self.plan.tab_name != '训练' or self.plan.category_name != '恶名狩猎' or self.plan.mission_type_name not in charge_mission_names('恶名狩猎'):
             return self.round_fail('深度追猎目标不在原数据中')

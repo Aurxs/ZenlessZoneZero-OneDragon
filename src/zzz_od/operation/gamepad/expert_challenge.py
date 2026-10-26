@@ -48,8 +48,8 @@ class GamepadExpertChallenge(GamepadCombatSimulation):
         """只接受原数据中的普通专业挑战室副本，不将特训目标当普通关卡。"""
         if self.plan.tab_name != '训练' or self.plan.category_name != '专业挑战室' or self.plan.mission_type_name not in charge_mission_names('专业挑战室'):
             return self.round_fail('专业挑战室目标不在已支持的原副本数据中')
-        if self.plan.level != '默认等级' or self.plan.predefined_team_idx not in range(-1, 6):
-            return self.round_fail('专业挑战室暂支持默认等级与当前编队或前六个预备编队')
+        if self.plan.level != '默认等级' or self.plan.predefined_team_idx not in range(-1, 20):
+            return self.round_fail('专业挑战室暂支持默认等级与当前编队或二十个预备编队')
         if self.plan.plan_times <= 0 or self.plan.run_times < 0 or self.plan.run_times >= self.plan.plan_times:
             return self.round_fail('计划次数无效或已完成')
         return self.round_success()
