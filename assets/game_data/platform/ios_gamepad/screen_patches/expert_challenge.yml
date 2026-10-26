@@ -39,3 +39,10 @@ added_areas:
   - 185
   - 1840
   - 910
+- area_name: 手柄-燃竭开关
+  area_type: none
+  pc_rect:
+  - 1370
+  - 660
+  - 1830
+  - 750
