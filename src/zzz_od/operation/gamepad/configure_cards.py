@@ -33,10 +33,10 @@ class GamepadConfigureCards(GamepadOperation):
 
     STATUS_AT_PRESET: ClassVar[str] = '已在模拟室预设'
 
-    def __init__(self, ctx: ZContext, num_cards: int, mission_name: str = '调查专项', mission_type_name: str = '基础材料') -> None:
+    def __init__(self, ctx: ZContext, num_cards: int | None, mission_name: str = '调查专项', mission_type_name: str = '基础材料') -> None:
         """保留明确目标数量，不自动把一张计划当作五张。"""
-        super().__init__(ctx, op_name=f'手柄配置{mission_name} {num_cards} 张卡片', timeout_seconds=180)
-        self.num_cards: int = num_cards
+        super().__init__(ctx, op_name=f'手柄配置{mission_name} {num_cards if num_cards is not None else "默认"} 张卡片', timeout_seconds=180)
+        self.num_cards: int | None = num_cards
         self.mission_name: str = mission_name
         self.mission_type_name: str = mission_type_name
         self._edit_sent: bool = False
@@ -127,7 +127,7 @@ class GamepadConfigureCards(GamepadOperation):
         """只支持一至五张，从预设或已确认大世界进入。"""
         if self.mission_name not in simulation_targets().get(self.mission_type_name, ()):
             return self.round_fail(f'尚未支持专项：{self.mission_name}')
-        if self.num_cards not in range(1, 6):
+        if self.num_cards is not None and self.num_cards not in range(1, 6):
             return self.round_fail('Mac 卡片数量须为1至5张')
         if self._editor_charge() is not None:
             if not self._cancel_editor_sent:
@@ -166,6 +166,18 @@ class GamepadConfigureCards(GamepadOperation):
     @operation_node(name='配置专项卡片', node_max_retry_times=20, timeout_seconds=45)
     def configure(self) -> OperationRoundResult:
         """预设 A 只打开菜单，只有编辑项已高亮才再 A，不触发开始战斗。"""
+        if self.num_cards is None:
+            if not self._preset_visible() or not preset_focused(self.ctx, self.last_screenshot, self.mission_name):
+                return self.round_retry('默认数量等待已确认的方案页', wait=0.8)
+            charge = read_preset_charge(self.ctx, self.last_screenshot)
+            if charge is None:
+                return self.round_retry('默认数量等待实际消耗', wait=0.8)
+            current, required = charge
+            if required not in (20, 40, 60, 80, 100):
+                return self.round_fail('已保存方案卡片为空或消耗无效，未修改卡组')
+            return self.round_success('保留已保存卡片数量', data={
+                'num_cards': required // 20, 'current_charge': current, 'required_charge': required,
+            })
         editor = self._editor_charge()
         if editor is not None:
             self._save('editor_before')

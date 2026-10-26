@@ -55,6 +55,7 @@ class GamepadCombatSimulation(GamepadOperation):
             instance_idx=self.ctx.current_instance_idx,
             group_id=application_const.DEFAULT_GROUP_ID,
         )
+        self._default_charge: int | None = None
         self._team_prepared: bool = False
         self._next_sent: bool = False
         self._deploy_sent: bool = False
@@ -69,6 +70,7 @@ class GamepadCombatSimulation(GamepadOperation):
 
     def handle_init(self) -> None:
         """重新执行时清除一次性输入和战斗记录。"""
+        self._default_charge = None
         self._next_sent = False
         self._team_prepared = False
         self._deploy_sent = False
@@ -127,14 +129,22 @@ class GamepadCombatSimulation(GamepadOperation):
         ).is_success for area in ('手柄-挑战结果', '手柄-完成'))
 
     @property
-    def expected_card_count(self) -> int:
-        """默认沿用五张目标，已保存的一张预设不能冒充默认五张。"""
-        return 5 if self.plan.card_num == CardNumEnum.DEFAULT.value.value else int(self.plan.card_num)
+    def expected_card_count(self) -> int | None:
+        """默认数量保留游戏已保存方案，显式数量才编辑。"""
+        return None if self.plan.card_num == CardNumEnum.DEFAULT.value.value else int(self.plan.card_num)
 
     @property
-    def expected_charge(self) -> int:
+    def expected_charge(self) -> int | None:
         """仅作一致性校验，是否足够仍读取当前画面电量。"""
-        return self.expected_card_count * 20
+        return self._default_charge if self.expected_card_count is None else self.expected_card_count * 20
+
+    def bind_prepared_charge(self, required: int) -> bool:
+        """默认数量绑定本场已核对的实际消耗，后续页面不得悄悄变更。"""
+        if required not in (20, 40, 60, 80, 100):
+            return False
+        if self.expected_charge is None:
+            self._default_charge = required
+        return self.expected_charge == required
 
     @operation_node(name='检查手柄计划', is_start_node=True)
     def check_plan(self) -> OperationRoundResult:
@@ -186,11 +196,12 @@ class GamepadCombatSimulation(GamepadOperation):
             return self.round_retry('返回方案页重新确认目标材料', wait=1)
         if self._found('手柄-挑战等级') and self._found('手柄-下一步') and self._preset_selected():
             charge = self.read_charge()
-            if charge is not None and charge[1] == self.expected_charge:
+            if charge is not None and self.bind_prepared_charge(charge[1]):
                 return self.round_success('目标专项与卡片已确认')
-        return self.round_by_op_result(
-            GamepadConfigureCards(self.ctx, self.expected_card_count, self.plan.mission_name, self.plan.mission_type_name).execute()
-        )
+        result = GamepadConfigureCards(self.ctx, self.expected_card_count, self.plan.mission_name, self.plan.mission_type_name).execute()
+        if result.success and not self.bind_prepared_charge(result.data['required_charge']):
+            return self.round_fail('保存后卡片消耗与本场目标不一致')
+        return self.round_by_op_result(result)
 
     @node_from(from_name='配置挑战卡片')
     @operation_node(name='准备当前编队', node_max_retry_times=10, timeout_seconds=75)
@@ -227,7 +238,7 @@ class GamepadCombatSimulation(GamepadOperation):
         if charge is None:
             return self.round_retry('未能确认实际电量消耗', wait=1)
         current, required = charge
-        if required != self.expected_charge:
+        if not self.bind_prepared_charge(required):
             return self.round_fail(f'当前预设消耗 {required} 电量，与目标 {self.expected_charge} 不一致')
         if current < required:
             return self.round_fail(self.STATUS_CHARGE_NOT_ENOUGH)
@@ -248,7 +259,7 @@ class GamepadCombatSimulation(GamepadOperation):
         if charge is None:
             return self.round_retry('未能确认出战电量', wait=1)
         current, required = charge
-        if required != self.expected_charge:
+        if not self.bind_prepared_charge(required):
             return self.round_fail(f'出战消耗 {required} 电量，与目标 {self.expected_charge} 不一致')
         if current < required:
             return self.round_fail(self.STATUS_CHARGE_NOT_ENOUGH)

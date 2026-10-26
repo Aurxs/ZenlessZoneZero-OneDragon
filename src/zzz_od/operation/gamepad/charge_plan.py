@@ -76,7 +76,7 @@ def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
                 return (
                     f'Mac 体力计划第 {index} 项的{labels[field]}“{value}”尚未支持；'
                     '目前仅支持训练/实战模拟室/基础/晋升/音擎改装/技能材料、默认等级、'
-                    '默认五卡、1至5张卡片，或区域巡防/专业挑战室普通副本；当前编队或前六个预备编队'
+                    '默认保留已保存数量、1至5张卡片，或区域巡防/专业挑战室普通副本；当前编队或前六个预备编队'
                 )
         if plan.category_name in ('区域巡防', '专业挑战室', '恶名狩猎') and plan.mission_type_name not in charge_mission_names(plan.category_name):
             return f'Mac 体力计划第 {index} 项的副本“{plan.category_name}/{plan.mission_type_name}”不在原数据中'
@@ -211,6 +211,8 @@ class GamepadChargePlan(GamepadOperation):
         if charge is None:
             return self.round_retry('未能确认实际电量消耗', wait=1)
         current, required = charge
+        if self._simulation.expected_charge is None and not self._simulation.bind_prepared_charge(required):
+            return self.round_fail('默认数量的实际卡片消耗无效')
         if required != self._simulation.expected_charge:
             return self.round_fail(
                 f'当前预设消耗 {required} 电量，与目标 {self._simulation.expected_charge} 不一致'
@@ -254,7 +256,7 @@ class GamepadChargePlan(GamepadOperation):
                 while following is not None:
                     required = {'区域巡防': 60, '专业挑战室': 40, '恶名狩猎': 60}.get(following.category_name)
                     if required is None:
-                        required = 100 if following.card_num == CardNumEnum.DEFAULT.value.value else int(following.card_num) * 20
+                        required = following.estimated_charge_power
                     if self.current_charge >= required:
                         self.current_plan.skipped = True
                         return self.round_success(self.STATUS_TRY_NEXT_PLAN)
