@@ -138,3 +138,34 @@ class GamepadChooseDialogOption(GamepadOperation):
         # 交互动画中 A 可能只补全台词。新帧仍完整显示同一选项和焦点才再次确认。
         self._confirm_sent = False
         return self.round_retry('等待对话选项关闭', wait=0.5)
+
+
+class GamepadReconnect(GamepadOperation):
+    """仅确认已识别的服务器超时弹窗，不重新登录或处理账号验证。"""
+
+    def __init__(self, ctx: ZContext) -> None:
+        """一次确认后等待弹窗消失，业务页面由调用方重新识别。"""
+        super().__init__(ctx, op_name='手柄继续服务器连接', timeout_seconds=20)
+        self._sent: bool = False
+
+    def handle_init(self) -> None:
+        self._sent = False
+
+    @operation_node(name='确认继续连接', is_start_node=True, node_max_retry_times=12)
+    def reconnect(self) -> OperationRoundResult:
+        """完整超时文案和继续连接黄色焦点同时成立才发送 A。"""
+        if self.last_screenshot is None:
+            return self.round_retry('等待网络弹窗截图', wait=1)
+        words = self.ctx.ocr.run_ocr(self.last_screenshot)
+        timeout = any('服务器连接超时' in text.replace(' ', '') for text in words)
+        if not timeout:
+            return self.round_success('连接弹窗已关闭，须重新识别业务页面') if self._sent else self.round_fail('未识别到服务器连接超时弹窗')
+        if self._sent:
+            return self.round_retry('等待服务器连接，不重复确认', wait=1)
+        choices = [match for text, matches in words.items() if text.replace(' ', '') == '继续连接'
+                   for match in matches if has_filled_highlight(self.last_screenshot, match.rect, 'yellow')]
+        if len(choices) != 1:
+            return self.round_fail('继续连接未处于唯一高亮，未发送输入')
+        self.ctx.controller.btn_tap('south')
+        self._sent = True
+        return self.round_retry('已请求继续连接', wait=1)
