@@ -84,7 +84,7 @@ OJD 首选失败时，按调研文档评估 libvirtualhid；只有外部服务�
 
 ## 4. P1：依赖、导入与源码启动
 
-当前已实现 Mac 源码入口：在项目根目录执行 `PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main`。Mac 重启沿用当前 Python，启动时跳过 Windows launcher 更新，保留模型检查。账户页的显式平台配置不会转换旧 PC 实例；修改平台、bundle ID 或 OJD 路径后会暂停、清理旧服务并要求重启。
+当前已实现 Mac 源码入口：在项目根目录执行 `PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main`。Mac 重启沿用当前 Python，启动时跳过 Windows launcher 更新，保留模型检查。游戏设置页的显式平台配置不会转换旧 PC 实例；修改平台、bundle ID 或 OJD 路径后会暂停、清理旧服务并要求重启。
 
 `game_session_entry` 已供 `ZApplication` / `ZOperation` / `ZOneDragonApp` 共用，Mac 已支持默认已保存账号的冷启动与已登录会话准备，不导入 Windows 登录流程，恢复时不激活窗口。原一条龙保留任务列表和顺序，运行前检查适配范围。初始化失败通过 `initialization_error` 返回，不发送 ready，也不等待运行超时。
 
@@ -189,7 +189,7 @@ def screenshot(self, independent: bool = False) -> tuple[float, MatLike | None]:
 
 按 bundle ID / PID / window ID 绑定游戏窗口，使用窗口级过滤，不采当前活动应用。音频和鼠标指针首版关闭。窗口重建后重新选择并清空旧帧，不能沿用旧 ID。
 
-输出遵守现有 RGB `uint8`、1920×1080 约定。顶部标题栏通过显式 `capture_top_inset_pixels` 传给 `MacWindowCapture.start(top_inset_pixels=...)`，默认 0，不自动猜测；账户页提供整数控件，本机确认值为 56。每帧按当前完整宽高裁去顶部后严格验证 16:9，正常窗口缩放仍可归一化，不要求固定窗口尺寸；错误比例不能靠拉伸通过。帧监测读取 `latest_frame()`，长按期间比例失效也会暂停输入；其他窗口装饰/黑边仅在有明确内容区依据时处理。不通过强行拉伸来掩盖 iOS UI 差异。转换点/像素属于宿主截图正确性，不新增通用任意分辨率框架。
+输出遵守现有 RGB `uint8`、1920×1080 约定。顶部标题栏通过显式 `capture_top_inset_pixels` 传给 `MacWindowCapture.start(top_inset_pixels=...)`，默认 0，不自动猜测；游戏设置页提供整数控件，本机确认值为 56。每帧按当前完整宽高裁去顶部后严格验证 16:9，正常窗口缩放仍可归一化，不要求固定窗口尺寸；错误比例不能靠拉伸通过。帧监测读取 `latest_frame()`，长按期间比例失效也会暂停输入；其他窗口装饰/黑边仅在有明确内容区依据时处理。不通过强行拉伸来掩盖 iOS UI 差异。转换点/像素属于宿主截图正确性，不新增通用任意分辨率框架。
 
 原 `ControllerBase.screenshot()` 使用调用时间；`ZMacController.screenshot()` 已覆盖为返回真实采集时间，避免旧帧被误判为新画面。过期、权限撤销或停止采集时返回无帧并暂停输入。采集时钟到现有时间基准的换算集中处理，不直接把系统 uptime 当 epoch 时间使用。
 

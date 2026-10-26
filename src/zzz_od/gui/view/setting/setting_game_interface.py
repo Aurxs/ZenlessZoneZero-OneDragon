@@ -41,6 +41,7 @@ from zzz_od.config.game_config import (
 )
 from zzz_od.context.zzz_context import ZContext
 from zzz_od.gui.view.setting.macos_gamepad_settings import MacGamepadSettings
+from zzz_od.gui.view.setting.macos_runtime_settings import MacRuntimeSettings
 
 
 class SettingGameInterface(VerticalScrollInterface):
@@ -48,6 +49,7 @@ class SettingGameInterface(VerticalScrollInterface):
     def __init__(self, ctx: ZContext, parent=None):
         self.ctx: ZContext = ctx
         self.macos_gamepad_settings: MacGamepadSettings | None = None
+        self.macos_runtime_settings: MacRuntimeSettings | None = None
 
         VerticalScrollInterface.__init__(
             self,
@@ -68,6 +70,9 @@ class SettingGameInterface(VerticalScrollInterface):
         content_widget.add_widget(self.help_opt)
 
         if sys.platform == 'darwin':
+            runtime_group = SettingCardGroup('Mac 运行设置（当前账户）')
+            self.macos_runtime_settings = MacRuntimeSettings(self.ctx, runtime_group, self)
+            content_widget.add_widget(runtime_group)
             gamepad_group = SettingCardGroup('Mac 手柄服务')
             self.macos_gamepad_settings = MacGamepadSettings(self.ctx, gamepad_group, self)
             content_widget.add_widget(gamepad_group)
@@ -244,6 +249,8 @@ class SettingGameInterface(VerticalScrollInterface):
 
     def on_interface_shown(self) -> None:
         VerticalScrollInterface.on_interface_shown(self)
+        if self.macos_runtime_settings is not None:
+            self.macos_runtime_settings.reload()
         if self.macos_gamepad_settings is not None:
             self.macos_gamepad_settings.reload()
 
