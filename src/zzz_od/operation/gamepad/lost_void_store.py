@@ -154,14 +154,14 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
             item.store_price = None
         if prices and price_area:
             for text, matches in prices[1].items():
-                price = re.fullmatch(r'[×xX]?\s*(\d+)', text.strip())
+                price = self.parse_price(text)
                 if price is None:
                     continue
                 for match in matches:
                     rect = match.rect
                     rect.add_offset(price_area.left_top)
                     for item in all_goods:
-                        item.add_price(int(price[1]), rect)
+                        item.add_price(price, rect)
         buttons = self.navigation._read_area('迷失之地-邦布商店', '区域-购买按钮')
         area = self.ctx.screen_loader.get_area('迷失之地-邦布商店', '区域-购买按钮')
         if buttons and area:
@@ -178,6 +178,14 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
             for item in all_goods
             if item.store_buy_rect is not None and item.store_price is not None
         ]
+
+    @staticmethod
+    def parse_price(text: str) -> int | None:
+        """忽略乘号前的货币图标误读，数字不得截断或与另一组价格混合。"""
+        match = re.fullmatch(r'[^0-9]*[×xX]\s*(\d+)\s*', text.strip())
+        if match is not None:
+            return int(match[1])
+        return int(text.strip()) if re.fullmatch(r'\d+', text.strip()) else None
 
     def _leave(self) -> OperationRoundResult:
         """明确商店返回图标后退出一次，等待局内新帧。"""
