@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.operation_node import operation_node
+from one_dragon.utils.log_utils import log
 from zzz_od.application.hollow_zero.lost_void.operation.interact.lost_void_bangboo_store import (
     LostVoidBangbooStore,
 )
@@ -95,6 +96,7 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         self._confirm_sent: bool = False
         self._pending_waits: int = 0
         self._leave_sent: bool = False
+        self._last_unmatched_balance: int | None = None
 
     def _balance(self) -> int | None:
         """余额栏只接受一个完整数字，不把刷新费用当成可用余额。"""
@@ -113,6 +115,21 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
     def _goods(self) -> tuple[list[LostVoidArtifactPos], list[LostVoidArtifactPos]]:
         """沿用原价格和名称解析，另读高亮按钮的黑字，防止漏掉当前商品。"""
         all_goods, _ = self.parser.get_artifact_pos(self.last_screenshot)
+        prices = self.navigation._read_area('迷失之地-邦布商店', '区域-价格')
+        price_area = self.ctx.screen_loader.get_area('迷失之地-邦布商店', '区域-价格')
+        # 原白色过滤会丢失抗锯齿的末位零。价格必须来自未经颜色过滤的完整文字。
+        for item in all_goods:
+            item.store_price = None
+        if prices and price_area:
+            for text, matches in prices[1].items():
+                price = re.fullmatch(r'[×xX]?\s*(\d+)', text.strip())
+                if price is None:
+                    continue
+                for match in matches:
+                    rect = match.rect
+                    rect.add_offset(price_area.left_top)
+                    for item in all_goods:
+                        item.add_price(int(price[1]), rect)
         buttons = self.navigation._read_area('迷失之地-邦布商店', '区域-购买按钮')
         area = self.ctx.screen_loader.get_area('迷失之地-邦布商店', '区域-购买按钮')
         if buttons and area:
@@ -154,7 +171,14 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
             self._pending_waits = 0
             return self.round_wait('商店实际扣款已核对', wait=0.6)
         if balance is not None and balance != self._before_balance:
-            return self.round_fail('商店余额变化与预期费用不一致，已停止')
+            self._pending_waits += 1
+            if balance == self._last_unmatched_balance or self._pending_waits >= 5:
+                self.save_screenshot(prefix='macos_lost_void_store_balance_mismatch')
+                return self.round_fail(
+                    f'商店余额{self._before_balance}→{balance}与费用{self._cost}不一致，已停止'
+                )
+            self._last_unmatched_balance = balance
+            return self.round_retry('等待商店余额数字动画稳定', wait=1)
         if not in_store and not self._confirm_sent:
             result = GamepadLostVoidStoreConfirm(self.ctx, self._pending).execute()
             if result.success:
@@ -177,6 +201,8 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         self._target_name = name
         self._confirm_sent = False
         self._pending_waits = 0
+        self._last_unmatched_balance = None
+        log.info('商店%s：目标=%s，实际余额=%d，费用=%d', action, name, balance, cost)
         self.save_screenshot(prefix='macos_lost_void_store_before_action')
         self.ctx.controller.btn_tap(key)
         return self.round_retry(f'等待商店{action}响应', wait=1)
@@ -232,6 +258,11 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         all_goods, goods = self._goods()
         if len(all_goods) < 4:
             return self.round_retry('等待完整商店商品识别', wait=1)
+        if any(
+            item.store_buy_rect is not None and item.store_price is None
+            for item in all_goods
+        ):
+            return self.round_retry('等待可购买商品的完整价格', wait=1)
         available = [item for item in goods if item.store_price <= balance]
         if not available:
             return self._leave()
