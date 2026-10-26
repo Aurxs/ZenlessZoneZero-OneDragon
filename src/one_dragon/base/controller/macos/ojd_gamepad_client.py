@@ -52,12 +52,14 @@ class OjdGamepadClient:
     """持久 CLI 适配器；只有一个线程写完整状态，断连后不重放动作。
 
     CLI 没有创建成功或逐帧接受回执，is_connected 仅表示传输仍存活。
-    本适配器不启动服务、不修改权限，也不注册进程级信号处理器。
+    仅在显式配置后按需后台启动服务，不修改权限或注册进程级信号处理器。
     """
 
     def __init__(self, ojd_path: str = 'ojd', frame_interval: float = 0.05,
-                 key_press_time: float = 0.1, combo_press_time: float = 0.5) -> None:
+                 key_press_time: float = 0.1, combo_press_time: float = 0.5,
+                 auto_start: bool = False) -> None:
         self.ojd_path: str = ojd_path
+        self.auto_start: bool = auto_start
         self.frame_interval: float = self._number(frame_interval, 0.008, 0.1)
         self.key_press_time: float = max(_MINIMUM_BUTTON_PRESS_TIME, self._number(key_press_time, 0.008))
         self.combo_press_time: float = self._number(combo_press_time, 0.0)
@@ -110,8 +112,8 @@ class OjdGamepadClient:
                 right_trigger=self._values.get('right_trigger', 0.0),
             )
 
-    def _preflight(self) -> str:
-        """保留 ojd 符号链接名，检查固定 CLI 和已运行的服务。"""
+    def _executable(self) -> str:
+        """保留 ojd 符号链接名，只检查命令和固定版本。"""
         found = shutil.which(self.ojd_path)
         if found is None or Path(found).name != 'ojd':
             raise OjdGamepadError('请指定现有 ojd 命令或名为 ojd 的符号链接，不能直接启动 app 主程序')
@@ -120,15 +122,44 @@ class OjdGamepadClient:
             version = subprocess.run([executable, '--version'], capture_output=True, text=True, timeout=5, check=True)
             if re.search(r'(?<![\w.])0\.6\.0-alpha\.1(?![\w.+-])', version.stdout) is None:
                 raise OjdGamepadError(f'仅支持 OJD {_OJD_VERSION}，实际为 {version.stdout.strip()!r}')
-            status = subprocess.run(
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+            raise OjdGamepadError(f'OJD 检查失败：{error}') from error
+        return executable
+
+    def inspect(self) -> dict[str, object]:
+        """只读获取官方服务和系统权限状态，不自动启动服务。"""
+        return self._status(self._executable())
+
+    @staticmethod
+    def _status(executable: str) -> dict[str, object]:
+        """读取指定命令的状态，不重复探测版本或启动服务。"""
+        try:
+            result = subprocess.run(
                 [executable, '--json', '--no-input', '--no-color', '--timeout', '2', 'status'],
                 capture_output=True, text=True, timeout=5, check=True,
             )
-            service = json.loads(status.stdout)['service']
-            if service['state'] != 'Running' or service.get('version') != _OJD_VERSION:
-                raise OjdGamepadError(f'OJD 服务必须运行且版本为 {_OJD_VERSION}')
-        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as error:
+            status = json.loads(result.stdout)
+            if not isinstance(status, dict) or not isinstance(status.get('service'), dict):
+                raise ValueError('OJD 状态协议无效')
+            return status
+        except (OSError, subprocess.SubprocessError, ValueError) as error:
             raise OjdGamepadError(f'OJD 检查失败：{error}') from error
+
+    def _preflight(self) -> str:
+        """只有用户配置自动启动时才在后台打开服务，然后检查运行状态。"""
+        executable = self._executable()
+        if self.auto_start:
+            try:
+                subprocess.run(
+                    [executable, '--json', '--no-input', '--no-color', '--timeout', '8', 'service', 'start'],
+                    capture_output=True, text=True, timeout=12, check=True,
+                )
+            except (OSError, subprocess.SubprocessError) as error:
+                raise OjdGamepadError(f'OJD 后台启动失败：{error}') from error
+        status = self._status(executable)
+        service = status['service']
+        if service.get('state') != 'Running' or service.get('version') != _OJD_VERSION:
+            raise OjdGamepadError(f'OJD 服务必须运行且版本为 {_OJD_VERSION}')
         return executable
 
     def connect(self) -> None:

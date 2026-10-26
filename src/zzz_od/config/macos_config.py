@@ -4,11 +4,21 @@ from one_dragon.base.config.yaml_config import YamlConfig
 
 
 class MacOsConfig(YamlConfig):
-    """保存 Mac 窗口采集、OJD CLI 和独立镜头校准参数。"""
+    """保存 Mac 窗口采集、OJD 连接和独立镜头校准参数。"""
 
     def __init__(self, instance_idx: int) -> None:
         """读取指定实例的 Mac 配置。"""
         super().__init__('macos', instance_idx=instance_idx)
+
+    @property
+    def ojd_auto_start(self) -> bool:
+        """一键配置后允许后台启动，旧配置保持原有行为。"""
+        return self.get('ojd_auto_start', False)
+
+    @ojd_auto_start.setter
+    def ojd_auto_start(self, value: bool) -> None:
+        """保存自动启动选择，不改变 OJD 自身的登录项。"""
+        self.update('ojd_auto_start', value)
 
     @property
     def ojd_cli_path(self) -> str:

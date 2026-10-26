@@ -74,6 +74,7 @@ class ZMacController(ControllerBase):
             gamepad = OjdGamepadClient(
                 ojd_path=macos_config.ojd_cli_path,
                 key_press_time=game_config.xbox_key_press_time,
+                auto_start=macos_config.ojd_auto_start,
             )
         if window_capture is None:
             from one_dragon.base.controller.macos.macos_window_capture import (

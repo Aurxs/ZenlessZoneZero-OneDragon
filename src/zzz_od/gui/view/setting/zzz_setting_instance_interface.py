@@ -32,7 +32,6 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         self.macos_bundle_opt: TextSettingCard | None = None
         self.macos_app_path_opt: TextSettingCard | None = None
         self.macos_launch_timeout_opt: SpinBoxSettingCard | None = None
-        self.macos_ojd_opt: TextSettingCard | None = None
         self.macos_top_inset_opt: SpinBoxSettingCard | None = None
         super().__init__(ctx=ctx, parent=parent)
 
@@ -66,12 +65,6 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         )
         self.macos_launch_timeout_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_launch_timeout_opt)
-        self.macos_ojd_opt = TextSettingCard(
-            icon=FluentIcon.FOLDER, title='OJD 命令路径',
-            content='填写 ojd 或其完整路径，命令名必须为 ojd',
-        )
-        self.macos_ojd_opt.value_changed.connect(self._on_mac_config_changed)
-        group.addSettingCard(self.macos_ojd_opt)
         self.macos_top_inset_opt = SpinBoxSettingCard(
             icon=FluentIcon.PHOTO, title='截图顶部裁剪', minimum=0, maximum=256,
             content='填已确认的标题栏像素高度；无标题栏填 0，剩余游戏内容须为 16:9',
@@ -95,7 +88,6 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
         self.macos_launch_timeout_opt.init_with_adapter(
             self.ctx.macos_config.get_prop_adapter('launch_timeout_seconds'),
         )
-        self.macos_ojd_opt.init_with_adapter(self.ctx.macos_config.get_prop_adapter('ojd_cli_path'))
         self.macos_top_inset_opt.init_with_adapter(
             self.ctx.macos_config.get_prop_adapter('capture_top_inset_pixels'),
         )
@@ -137,3 +129,4 @@ class ZSettingInstanceInterface(SettingInstanceInterface):
             self.ctx.controller = None
         event = ContextNotifyEvent.info('配置已保存', self.ctx.initialization_error)
         self.ctx.dispatch_event(ContextNotifyEvent.EVENT_ID, event)
+
