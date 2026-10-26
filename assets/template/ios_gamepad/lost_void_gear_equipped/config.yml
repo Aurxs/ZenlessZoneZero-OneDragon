@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_gear_equipped
+template_name: 迷失之地武备已携带标记
+template_shape: circle
+auto_mask: true
+point_list:
+- 622, 941
+- 640, 941
