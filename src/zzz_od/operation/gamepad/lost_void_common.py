@@ -159,16 +159,15 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
             and 20 <= h <= 70
             and cv2.contourArea(contour) / (w * h) > 0.65
         ]
-        self._gear_layout = False
-        if result:
-            return sorted(result, key=lambda item: item.center.x)
-        if self.round_by_find_area(
+        self._gear_layout = self.round_by_find_area(
             self.last_screenshot, '迷失之地-通用选择', '区域-武备标识'
-        ).is_success:
+        ).is_success
+        if self._gear_layout:
             gear = self.ctx.screen_loader.get_area('迷失之地-通用选择', '区域-武备名称')
             if gear is not None:
-                self._gear_layout = True
                 return [gear.rect]
+        if result:
+            return sorted(result, key=lambda item: item.center.x)
         return []
 
     def can_handle(self) -> bool:
