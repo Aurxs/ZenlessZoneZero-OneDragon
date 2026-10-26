@@ -29,17 +29,28 @@ if TYPE_CHECKING:
 class GamepadLostVoidStoreConfirm(GamepadOperation):
     """商店交易弹窗没有商品名，只按已发起的交易类型核对明确文案。"""
 
-    def __init__(self, ctx: ZContext, action: str) -> None:
+    def __init__(self, ctx: ZContext, action: str, accept: bool = True) -> None:
         if action not in ('购买', '刷新'):
             raise ValueError('未知商店交易类型')
         super().__init__(
             ctx, op_name=f'手柄迷失之地商店{action}确认', timeout_seconds=15
         )
         self.action: str = action
+        self.accept: bool = accept
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(
             ctx, '作战', '周期征讨'
         )
         self._sent: bool = False
+        self._moved: bool = False
+
+    def can_handle(self) -> bool:
+        """只识别本类交易的明确正文，不根据背景商品或默认按钮猜测。"""
+        if self.last_screenshot is None:
+            return False
+        self.navigation.last_screenshot = self.last_screenshot
+        body = self.navigation._read_area('迷失之地-邦布商店', '手柄-购买正文')
+        text = ''.join(body[1]).replace(' ', '') if body else ''
+        return '是否确认购买此商品' in text if self.action == '购买' else '刷新' in text
 
     @operation_node(
         name='核对交易弹窗后确认', is_start_node=True, node_max_retry_times=8
@@ -49,11 +60,7 @@ class GamepadLostVoidStoreConfirm(GamepadOperation):
             return self.round_retry('等待商店确认截图', wait=1)
         nav = self.navigation
         nav.last_screenshot = self.last_screenshot
-        body = nav._read_area('迷失之地-邦布商店', '手柄-购买正文')
-        text = ''.join(body[1]).replace(' ', '') if body else ''
-        known = (
-            '是否确认购买此商品' in text if self.action == '购买' else '刷新' in text
-        )
+        known = self.can_handle()
         if self._sent:
             return (
                 self.round_retry('等待商店确认弹窗关闭', wait=1)
@@ -63,6 +70,30 @@ class GamepadLostVoidStoreConfirm(GamepadOperation):
         confirm = nav._read_area('迷失之地-邦布商店', '按钮-购买-确认')
         prompt = nav._read_area('迷失之地-邦布商店', '手柄-商店确认提示')
         button = nav._text_rect(confirm[1], '确认') if confirm else None
+        if not self.accept:
+            choices = nav._read_area('迷失之地-邦布商店', '手柄-商店确认选项')
+            cancel = nav._text_rect(choices[1], '取消') if choices else None
+            accept = nav._text_rect(choices[1], '确认') if choices else None
+            if (
+                not known
+                or not choices
+                or cancel is None
+                or accept is None
+                or not prompt
+                or not all(
+                    nav._text_rect(prompt[1], word) is not None
+                    for word in ('A', '选择')
+                )
+            ):
+                return self.round_retry('等待完整购买取消条件', wait=1)
+            if has_filled_highlight(choices[0], cancel, 'yellow'):
+                self.save_screenshot(prefix='macos_lost_void_store_cancel')
+                self.ctx.controller.btn_tap('south')
+                self._sent = True
+            elif not self._moved and has_filled_highlight(choices[0], accept, 'yellow'):
+                self.ctx.controller.btn_tap('dpad_left')
+                self._moved = True
+            return self.round_retry('等待取消未核对的购买', wait=1)
         if (
             known
             and button
@@ -97,6 +128,7 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         self._pending_waits: int = 0
         self._leave_sent: bool = False
         self._last_unmatched_balance: int | None = None
+        self._unplanned_cancel_count: int = 0
 
     def _balance(self) -> int | None:
         """余额栏只接受一个完整数字，不把刷新费用当成可用余额。"""
@@ -227,6 +259,17 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
             )
             is not None
         )
+        if not in_store and self._pending is None:
+            cancel = GamepadLostVoidStoreConfirm(self.ctx, '购买', accept=False)
+            cancel.last_screenshot = self.last_screenshot
+            if cancel.can_handle():
+                if self._unplanned_cancel_count >= 2:
+                    return self.round_fail('商店反复出现未核对的购买，已停止')
+                result = cancel.execute()
+                if result.success:
+                    self._unplanned_cancel_count += 1
+                    return self.round_wait('额外购买已取消，重新核对商店', wait=1)
+                return self.round_by_op_result(result)
         if not in_store and self._pending and self.common.can_handle():
             result = GamepadLostVoidChooseCommon(self.ctx).execute()
             return (

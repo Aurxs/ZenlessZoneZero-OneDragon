@@ -28,3 +28,10 @@ added_areas:
   - 680
   - 1040
   - 740
+- area_name: 手柄-商店确认选项
+  area_type: none
+  pc_rect:
+  - 650
+  - 580
+  - 1270
+  - 680
