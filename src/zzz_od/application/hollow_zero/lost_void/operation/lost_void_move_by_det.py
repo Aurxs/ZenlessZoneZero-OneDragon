@@ -43,17 +43,21 @@ class MoveTargetWrapper:
         self.entire_rect: Rect = self.target_rect_list[0]
         self.merge_parent = None  # 合并后的父节点
 
-    def merge_another_target(self, other) -> bool:
+    def merge_another_target(self, other: 'MoveTargetWrapper') -> bool:
         """
         尝试合并一个入口
         @return: 是否合并成功
         """
-        if other.is_mixed and other.merge_parent is not None:
+        while other.is_mixed and other.merge_parent is not None:
             other: MoveTargetWrapper = other.merge_parent
 
         this = self
-        if this.is_mixed and this.merge_parent is not None:
+        while this.is_mixed and this.merge_parent is not None:
             this: MoveTargetWrapper = this.merge_parent
+
+        # 同一组合不能再次合并到自身，否则根节点也会被入口筛选过滤。
+        if this is other:
+            return False
 
         is_merge = False
         for x in this.target_rect_list:
@@ -91,8 +95,8 @@ class MoveTargetWrapper:
                 if rect.y2 > y2:
                     y2 = rect.y2
 
-            self.leftest_target_name = this.target_name_list[leftest_entry_idx]
-            self.entire_rect = Rect(x1, y1, x2, y2)
+            this.leftest_target_name = this.target_name_list[leftest_entry_idx]
+            this.entire_rect = Rect(x1, y1, x2, y2)
 
         return is_merge
 
