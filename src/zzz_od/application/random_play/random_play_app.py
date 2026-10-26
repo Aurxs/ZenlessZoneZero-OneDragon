@@ -123,6 +123,12 @@ class RandomPlayApp(ZApplication):
         return message in normalized and '选择' in normalized and confirm is not None \
             and confirm.max is not None and has_filled_highlight(image, confirm.max.rect, 'yellow')
 
+    def _macos_started_visible(self) -> bool:
+        """经营成功有不同祝词，仍须同时确认按钮焦点与选择提示。"""
+        return any(self._macos_confirm_visible(text) for text in (
+            '诚信经营，丁尼为本', '丁尼广进，生意兴隆',
+        ))
+
     def _macos_choose_promoter(self) -> OperationRoundResult:
         """随机配置确认当前合法焦点，指定人物只接受当前已识别焦点，不滚屏替换。"""
         valid_agents = {item.value.agent_name for item in AgentEnum} | {'邦布18'}
@@ -182,7 +188,7 @@ class RandomPlayApp(ZApplication):
             self.retried_transport = True
 
         if sys.platform == 'darwin' and self.last_screenshot is not None:
-            if self._macos_confirm_visible('诚信经营，丁尼为本'):
+            if self._macos_started_visible():
                 return self.round_success(self.STATUS_MACOS_STARTED)
             if self._macos_confirm_visible('是否准备营业'):
                 return self.round_success(self.STATUS_MACOS_CONFIRM)
@@ -649,11 +655,11 @@ class RandomPlayApp(ZApplication):
     @operation_node(name='营业后确认')
     def confirm(self) -> OperationRoundResult:
         if sys.platform == 'darwin':
-            if not self._macos_confirm_visible('诚信经营，丁尼为本'):
-                return fail_shop_state(self, '影像店营业', '无法确认营业成功弹窗和确认焦点')
-            save_shop_frame(self, '影像店营业', '营业成功')
-            self.ctx.controller.btn_tap('south')
-            return self.round_success(wait=1)
+            from zzz_od.operation.gamepad.confirmation import (
+                confirm_expected_single_dialog,
+            )
+
+            return confirm_expected_single_dialog(self)
         return self.round_by_find_and_click_area(self.last_screenshot, '影像店营业', '营业后确认',
                                                  retry_wait=1)
 
