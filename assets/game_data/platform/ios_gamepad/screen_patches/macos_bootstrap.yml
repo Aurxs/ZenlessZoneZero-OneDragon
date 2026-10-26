@@ -135,3 +135,31 @@ screen:
     - 1005
     - 1810
     - 1045
+  - area_name: 登录后-活动说明
+    area_type: none
+    pc_rect:
+    - 1180
+    - 130
+    - 1900
+    - 340
+  - area_name: 登录后-活动按键
+    area_type: none
+    pc_rect:
+    - 800
+    - 880
+    - 1110
+    - 960
+  - area_name: 登录后-活动卡片
+    area_type: none
+    pc_rect:
+    - 580
+    - 350
+    - 1895
+    - 875
+  - area_name: 登录后-获得奖励
+    area_type: none
+    pc_rect:
+    - 760
+    - 350
+    - 1160
+    - 860

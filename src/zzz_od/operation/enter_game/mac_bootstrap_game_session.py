@@ -9,6 +9,7 @@ from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.operation import Operation
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils.log_utils import log
+from zzz_od.operation.gamepad.focus import has_filled_highlight
 
 if TYPE_CHECKING:
     from one_dragon.base.controller.macos.macos_bootstrap_pointer import (
@@ -191,6 +192,10 @@ class MacBootstrapGameSession(Operation):
         if login_result is not None:
             return login_result
 
+        event_result = self._prepare_login_event()
+        if event_result is not None:
+            return event_result
+
         if self._has_text('输入-UI布局', 'UI布局'):
             if self._has_text('输入-当前布局', '手柄'):
                 self._gamepad_confirmed = True
@@ -223,6 +228,36 @@ class MacBootstrapGameSession(Operation):
             return self._send_action('打开触屏设置', area_name='菜单-设置')
 
         return self._wait_for_known_screen()
+
+    def _prepare_login_event(self) -> OperationRoundResult | None:
+        """可选全新放送先领再退；A、A、B 各自只在对应画面发送一次。"""
+        claimed = '领取版本登录奖励' in self._sent_actions
+        confirmed = '确认版本登录奖励' in self._sent_actions
+        if claimed and self._has_text('登录后-获得奖励', '获得'):
+            rect = self._text_rect('登录后-获得奖励', '确认')
+            if rect is not None and self._has_text('登录后-获得奖励', '选择') \
+                    and has_filled_highlight(self.last_screenshot, rect, 'yellow'):
+                return self._send_action('确认版本登录奖励', gamepad_key='south')
+            return self.round_wait('等待版本奖励确认按钮', wait=0.4)
+        if (
+            self._has_text('登录后-活动说明', '全新放送')
+            and self._has_text('登录后-活动说明', '累计登录7天')
+            and self._has_text('登录后-活动按键', '返回')
+            and self._has_text('登录后-活动按键', 'B')
+        ):
+            if confirmed:
+                return self._send_action('关闭登录后全新放送', gamepad_key='east')
+            if claimed:
+                return self._wait_after_action('领取版本登录奖励')
+            area = self.ctx.screen_loader.get_area(self.SCREEN_NAME, '登录后-活动卡片')
+            image = self.last_screenshot[area.y1:area.y2, area.x1:area.x2]
+            for text, matches in self._read_area('登录后-活动卡片').items():
+                if text.replace(' ', '').startswith('领取') and matches.max is not None \
+                        and has_filled_highlight(image, matches.max.rect, 'yellow'):
+                    self.save_screenshot(prefix='macos_login_event_before')
+                    return self._send_action('领取版本登录奖励', gamepad_key='south')
+            return self.round_fail('全新放送未识别到可领取焦点，未跳过奖励')
+        return None
 
     def _prepare_login(self) -> OperationRoundResult | None:
         """只处理已建档的登录就绪页，成对凭据提示出现时停止。"""
