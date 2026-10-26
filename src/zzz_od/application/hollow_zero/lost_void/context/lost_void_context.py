@@ -1,14 +1,16 @@
 import os
 import re
+import sys
 import time
 
 from cv2.typing import MatLike
 
 from one_dragon.base.config.yaml_operator import YamlOperator
+from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.screen import screen_utils
 from one_dragon.base.screen.screen_utils import FindAreaResultEnum
-from one_dragon.utils import cv2_utils, os_utils, str_utils
+from one_dragon.utils import cv2_utils, gpu_executor, os_utils, str_utils
 from one_dragon.utils.i18_utils import gt
 from one_dragon.utils.log_utils import log
 from one_dragon.yolo.detect_utils import DetectFrameResult
@@ -187,6 +189,9 @@ class LostVoidContext:
                 if label[5:] not in ignore_list:
                     to_detect_labels.append(label)
 
+        if sys.platform == 'darwin':
+            return gpu_executor.submit(self.detector.run, screen, run_time=screenshot_time,
+                                       label_list=to_detect_labels).result()
         return self.ctx.lost_void.detector.run(screen, run_time=screenshot_time,
                                                label_list=to_detect_labels)
 
@@ -344,6 +349,7 @@ class LostVoidContext:
         screen: MatLike,
         to_choose_gear_branch: bool = False,
         screen_name: str = '迷失之地-通用选择',
+        name_rects: list[Rect] | None = None,
     ) -> list[LostVoidArtifactPos]:
         """
         识别画面中出现的藏品
@@ -362,7 +368,7 @@ class LostVoidContext:
             gt('NEW!', 'game')
         ]
 
-        artifact_pos_list = self._build_artifact_candidates_from_name_ocr(screen, screen_name)
+        artifact_pos_list = self._build_artifact_candidates_from_name_ocr(screen, screen_name, name_rects)
 
         # 识别武备分支
         if to_choose_gear_branch:
@@ -449,6 +455,7 @@ class LostVoidContext:
         self,
         screen: MatLike,
         screen_name: str,
+        name_rects: list[Rect] | None = None,
     ) -> list[LostVoidArtifactPos]:
         """
         从“区域-藏品名称”OCR结果构建候选：
@@ -462,11 +469,15 @@ class LostVoidContext:
             log.warning(f'获取区域失败 screen={screen_name} area=区域-藏品名称 err={e}')
             return []
 
-        ocr_result_map = self.ctx.ocr_service.get_ocr_result_map(
-            image=screen,
-            rect=area.rect,
-            crop_first=True,
-        )
+        ocr_result_map = {}
+        for name_rect in name_rects if name_rects is not None else [area.rect]:
+            partial = self.ctx.ocr_service.get_ocr_result_map(image=screen, rect=name_rect, crop_first=True)
+            for text, matches in partial.items():
+                if text in ocr_result_map:
+                    for match in matches:
+                        ocr_result_map[text].append(match)
+                else:
+                    ocr_result_map[text] = matches
 
         raw_candidates: list[LostVoidArtifactPos] = []
         for ocr_text, mrl in ocr_result_map.items():

@@ -1,0 +1,23 @@
+screen_id: lost_void_choose_common
+area_patches:
+  区域-藏品名称:
+    pc_rect:
+    - 80
+    - 500
+    - 1898
+    - 565
+added_areas:
+- area_name: 手柄-名称栏搜索
+  area_type: none
+  pc_rect:
+  - 80
+  - 440
+  - 1898
+  - 650
+- area_name: 手柄-确认底栏
+  area_type: none
+  pc_rect:
+  - 780
+  - 780
+  - 1165
+  - 985
