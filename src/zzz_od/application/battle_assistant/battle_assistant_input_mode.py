@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 from one_dragon.base.controller.pc_button import pc_button_utils
@@ -11,6 +12,10 @@ if TYPE_CHECKING:
 
 def apply_battle_assistant_input_mode(ctx: ZContext) -> tuple[bool, str]:
     """按游戏助手临时后台开关和全局后台配置切换 controller。"""
+    if sys.platform == 'darwin':
+        if not ctx.controller.is_game_window_ready or not ctx.controller.gamepad.is_connected:
+            return False, 'Mac 原生手柄或游戏采集尚未就绪'
+        return True, 'Mac 原生手柄'
     config = ctx.battle_assistant_config
 
     if config.background_mode:

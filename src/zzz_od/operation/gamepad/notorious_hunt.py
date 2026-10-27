@@ -181,8 +181,10 @@ class GamepadHuntTransport(GamepadOperation):
         """只在固定剩余次数提示可见时保存落地画面。"""
         self.navigation.last_screenshot = self.last_screenshot
         area = self.navigation._read_area('恶名狩猎', '手柄-页面文字')
-        if area is not None and any(
-            '剩余' in text and '次数' in text for text in area[1]
+        text = ''.join(area[1]).replace(' ', '') if area is not None else ''
+        if area is not None and (
+            any('剩余' in word and '次数' in word for word in area[1])
+            or (self.target in text and '挑战等级' in text and '深度追猎' in text)
         ):
             name = self.save_screenshot(prefix='macos_hunt_entry')
             return self.round_success('恶名狩猎入口已就绪', data={
@@ -193,13 +195,43 @@ class GamepadHuntTransport(GamepadOperation):
         return self.round_retry('等待恶名狩猎入口', wait=1)
 
 
+class GamepadConfirmUnrewardedHunt(GamepadOperation):
+    """只确认奖励次数耗尽的免费提示，不确认电量购买。"""
+
+    def __init__(self, ctx: ZContext) -> None:
+        super().__init__(ctx, op_name='确认无报酬挑战', timeout_seconds=20)
+        self._sent: bool = False
+
+    @operation_node(name='确认无报酬提示', is_start_node=True, node_max_retry_times=8)
+    def confirm(self) -> OperationRoundResult:
+        """固定提示语义与黄色确认同时命中才按 A。"""
+        if all(self.round_by_find_area(self.last_screenshot, '实战模拟室', name).is_success
+               for name in ('手柄-出战', '手柄-预备编队')):
+            return self.round_success('无报酬编队已打开')
+        words = self.ctx.ocr.run_ocr(self.last_screenshot)
+        text = ''.join(words).replace(' ', '')
+        if not all(value in text for value in ('奖励的次数已耗尽', '无法获得挑战奖励', '是否继续挑战')):
+            if self._sent:
+                return self.round_retry('等待确认后的编队动画结束', wait=1)
+            return self.round_fail('未确认无报酬提示，未发送确认')
+        confirm = [item.rect for word, matches in words.items() if word.replace(' ', '') == '确认' for item in matches]
+        if len(confirm) == 1 and has_filled_highlight(self.last_screenshot, confirm[0], 'yellow'):
+            if not self._sent:
+                self.save_screenshot(prefix='macos_hunt_unrewarded_notice')
+                self.ctx.controller.btn_tap('south')
+                self._sent = True
+            return self.round_retry('等待无报酬编队页', wait=1)
+        return self.round_retry('等待无报酬确认高亮', wait=1)
+
+
 class GamepadHuntPrepare(GamepadOperation):
     """按原计划选择难度与当前编队，准备阶段不开始战斗。"""
 
-    def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
+    def __init__(self, ctx: ZContext, plan: ChargePlanItem, unrewarded: bool = False) -> None:
         """明确目标和难度，不把未知剩余次数当作免费机会。"""
         super().__init__(ctx, op_name='手柄恶名狩猎出战准备', timeout_seconds=220)
         self.plan: ChargePlanItem = plan
+        self.unrewarded: bool = unrewarded
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(
             ctx, '训练', '恶名狩猎', plan.mission_type_name,
         )
@@ -236,6 +268,10 @@ class GamepadHuntPrepare(GamepadOperation):
         if match is None or int(match[2]) != 3:
             return self.round_retry('等待免费奖励次数', wait=0.5)
         self.left_times = int(match[1])
+        if self.unrewarded:
+            if self.left_times != 0 or '无报酬模式' not in text or 'OFF' not in text.upper():
+                return self.round_fail('未确认零奖励次数、无报酬模式及深度追猎 OFF，未进入练习')
+            return self.round_success('已确认无报酬模式')
         if not 0 < self.left_times <= 3:
             return self.round_fail('免费奖励次数已用完，不进入深度追猎')
         return self.round_success()
@@ -313,7 +349,21 @@ class GamepadHuntPrepare(GamepadOperation):
                 'left_times': self.left_times, 'level': self._resolved_level,
                 'team_idx': self.plan.predefined_team_idx,
             })
+        if self.unrewarded:
+            words = self.ctx.ocr.run_ocr(self.last_screenshot)
+            if '无法获得挑战奖励' in ''.join(words).replace(' ', ''):
+                result = GamepadConfirmUnrewardedHunt(self.ctx).execute()
+                if result.success:
+                    self._next_sent = True
+                    return self.round_retry('无报酬提示已确认，等待编队', wait=0.5)
+                return self.round_by_op_result(result)
         if not self._next_sent:
+            if self.unrewarded:
+                self.navigation.last_screenshot = self.last_screenshot
+                area = self.navigation._read_area('恶名狩猎', '手柄-页面文字')
+                text = ''.join(area[1]).replace(' ', '') if area is not None else ''
+                if '无报酬模式' not in text or 'OFF' not in text.upper():
+                    return self.round_fail('无报酬模式发生变化，未进入出战编队')
             self.ctx.controller.btn_tap('start')
             self._next_sent = True
         return self.round_retry('等待当前编队页面', wait=0.8)
@@ -356,7 +406,10 @@ class GamepadHuntDeploy(GamepadOperation):
     @operation_node(name='等待挑战场景', node_max_retry_times=25, timeout_seconds=30)
     def wait_scene(self) -> OperationRoundResult:
         """等战斗 HUD 出现后记录场景，后续由战前交互操作处理。"""
-        if self.last_screenshot is not None and self.ctx.auto_battle_context.is_normal_attack_btn_available(self.last_screenshot):
+        if self.last_screenshot is not None and (
+            self.ctx.auto_battle_context.is_normal_attack_btn_available(self.last_screenshot)
+            or self.round_by_find_area(self.last_screenshot, '战斗画面', '按键-交互').is_success
+        ):
             name = self.save_screenshot(prefix='macos_hunt_scene')
             return self.round_success('挑战场景已加载', data={
                 'screenshot': debug_utils.get_debug_image_path(name),
@@ -550,8 +603,10 @@ def read_hunt_result(operation: GamepadOperation) -> bool | None:
     ).is_success:
         return None
     area = operation.ctx.screen_loader.get_area('恶名狩猎', '手柄-通关目标')
-    words = operation.ctx.ocr.crop_and_run_ocr(operation.last_screenshot, area.rect)
-    text = ''.join(words).replace(' ', '')
+    words = operation.ctx.ocr.run_ocr(operation.last_screenshot)
+    row = [(item.center.x, text) for text, matches in words.items() for item in matches
+           if area.rect.x1 <= item.center.x <= area.rect.x2 and area.rect.y1 <= item.center.y <= area.rect.y2]
+    text = ''.join(text for _, text in sorted(row)).replace(' ', '')
     if '完成恶名狩猎' not in text:
         return None
     match = re.search(r'([01])/1', text)
@@ -571,8 +626,11 @@ class GamepadHuntResultExit(GamepadOperation):
         self.won = read_hunt_result(self)
         if self.won is None:
             return self.round_retry('等待明确的恶名狩猎结果', wait=1)
-        if not (self.round_by_find_area(self.last_screenshot, '恶名狩猎', '手柄-结果退出').is_success
-                or self.round_by_find_area(self.last_screenshot, '战斗画面', '手柄-完成').is_success):
+        words = self.ctx.ocr.run_ocr(self.last_screenshot)
+        exit_visible = any(text.replace(' ', '') in ('退出', '完成')
+                           and any(item.center.x >= 1630 and item.center.y >= 980 for item in matches)
+                           for text, matches in words.items())
+        if not exit_visible:
             return self.round_retry('等待结算退出按钮', wait=1)
         self.ctx.auto_battle_context.stop_auto_battle()
         self.ctx.controller.resume_input()

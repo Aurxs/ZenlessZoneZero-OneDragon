@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
@@ -158,6 +159,7 @@ class BattleAssistantInterface(AppRunInterface):
             content='仅控制当前功能是否临时启用后台模式；相关配置请前往「设置 → 游戏设置」调整',
         )
         self.background_mode_opt.value_changed.connect(self._on_background_mode_changed)
+        self.background_mode_opt.setVisible(sys.platform != 'darwin')
         top.add_widget(self.background_mode_opt)
 
         self.mode_segment.setCurrentItem(self.MODE_AUTO_BATTLE)
@@ -337,12 +339,22 @@ class BattleAssistantInterface(AppRunInterface):
             '同时，请确保游戏画面没有被其他窗口遮挡，让 AI 能看清全局。\n\n'
             '祝您游戏愉快！'
         )
+        if sys.platform == 'darwin':
+            content = (
+                '从大世界启动时会自动准备手柄模式，并等待进入战斗。\n\n'
+                '已经在原生手柄战斗或战况菜单时也可启动；菜单中保持等待，返回战斗后继续。\n\n'
+                '暂停和停止会释放按钮、摇杆与扳机；继续时重新检查战斗画面。'
+                '自动战斗和闪避助手分别使用当前所选策略。\n\n'
+                'Core ML 开关在下次启动助手时生效，关闭后使用 CPU。'
+            )
         w = MessageBox(gt("使用说明"), content, self.window())
         w.cancelButton.hide()
         w.yesButton.setText(gt("确认"))
         w.exec()
 
     def _on_background_mode_changed(self, value: bool) -> None:
+        if sys.platform == 'darwin':
+            return
         if value and not pc_button_utils.is_vgamepad_installed():
             self.background_mode_opt.setValue(False, emit_signal=False)
             if self.background_mode_opt.adapter is not None:

@@ -18,3 +18,13 @@ added_areas:
   - 1050
   text: 完成
   lcs_percent: 0.8
+- area_name: 手柄-闪避键提示
+  area_type: template
+  pc_rect:
+  - 1520
+  - 1000
+  - 1610
+  - 1070
+  template_sub_dir: ios_gamepad
+  template_id: dialog_a
+  template_match_threshold: 0.8

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, ClassVar
 
 from one_dragon.base.operation.operation_base import OperationResult
@@ -14,6 +15,7 @@ from zzz_od.application.zzz_application import ZApplication
 
 if TYPE_CHECKING:
     from zzz_od.context.zzz_context import ZContext
+    from zzz_od.operation.gamepad.battle_assistant import MacBattleAssistantSession
 
 
 class AutoBattleApp(ZApplication):
@@ -32,13 +34,29 @@ class AutoBattleApp(ZApplication):
             app_id=auto_battle_const.APP_ID,
             op_name=auto_battle_const.APP_NAME,
         )
+        self._mac_session: MacBattleAssistantSession | None = None
+
+    def execute(self) -> OperationResult:
+        """Mac 可从已确认的手柄战斗启动，也可先准备大世界等待。"""
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.battle_assistant import (
+                execute_macos_battle_assistant,
+            )
+
+            return execute_macos_battle_assistant(self)
+        return super().execute()
 
     def handle_init(self) -> None:
         """
         执行前的初始化 由子类实现
         注意初始化要全面 方便一个指令重复使用
         """
-        pass
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.battle_assistant import (
+                MacBattleAssistantSession,
+            )
+
+            self._mac_session = MacBattleAssistantSession(self.ctx, self.ctx.battle_assistant_config.auto_ultimate_enabled)
 
     @operation_node(name='手柄检测', is_start_node=True)
     def check_gamepad(self) -> OperationRoundResult:
@@ -70,7 +88,10 @@ class AutoBattleApp(ZApplication):
             AutoBattleApp.EVENT_OP_LOADED,
             self.ctx.auto_battle_context.auto_op,
         )
-        self.ctx.auto_battle_context.start_auto_battle()
+        if self._mac_session is not None:
+            self._mac_session.update(self.last_screenshot)
+        else:
+            self.ctx.auto_battle_context.start_auto_battle()
         # 只有在手动使用自动战斗指令时，才使用配置中的开关
         # 其他指令调用 start_auto_battle 时，会使用默认值 True
         self.ctx.auto_battle_context.auto_ultimate_enabled = self.ctx.battle_assistant_config.auto_ultimate_enabled
@@ -84,20 +105,30 @@ class AutoBattleApp(ZApplication):
         识别当前画面 并进行点击
         :return:
         """
-        self.ctx.auto_battle_context.check_battle_state(self.last_screenshot, self.last_screenshot_time)
+        if self._mac_session is None or self._mac_session.update(self.last_screenshot):
+            self.ctx.auto_battle_context.check_battle_state(self.last_screenshot, self.last_screenshot_time)
         return self.round_wait(wait_round_time=self.ctx.battle_assistant_config.screenshot_interval)
 
     def handle_pause(self, e=None):
-        self.ctx.auto_battle_context.stop_auto_battle()
+        if self._mac_session is not None:
+            self._mac_session.pause()
+        else:
+            self.ctx.auto_battle_context.stop_auto_battle()
 
     def handle_resume(self, e=None):
         if self.current_node.node is not None and self.current_node.node.cn == '画面识别':
-            self.ctx.auto_battle_context.resume_auto_battle()
+            if self._mac_session is not None:
+                self._mac_session.update(self.ctx.controller.get_screenshot())
+            else:
+                self.ctx.auto_battle_context.resume_auto_battle()
 
     def after_operation_done(self, result: OperationResult) -> None:
         # try/finally 保证基类 after_operation_done 必跑(运行记录/通知/APPLICATION_STOP),
         # 即便 stop_auto_battle(多步收尾)抛异常也不跳过(CodeRabbit review)。
         try:
-            self.ctx.auto_battle_context.stop_auto_battle()
+            if self._mac_session is not None:
+                self._mac_session.close()
+            else:
+                self.ctx.auto_battle_context.stop_auto_battle()
         finally:
             ZApplication.after_operation_done(self, result)

@@ -81,6 +81,32 @@ class GamepadEnableDeepHunt(GamepadOperation):
         return self.round_retry('等待深度追猎状态明确', wait=1)
 
 
+class GamepadDisableDeepHunt(GamepadOperation):
+    """只关闭已确认目标的深度模式，不消耗电量或进入战斗。"""
+
+    def __init__(self, ctx: ZContext, mission_type_name: str) -> None:
+        super().__init__(ctx, op_name='手柄切回无报酬模式', timeout_seconds=20)
+        self.target: str = mission_type_name
+        self._sent: bool = False
+
+    @operation_node(name='关闭深度追猎', is_start_node=True, node_max_retry_times=8)
+    def disable(self) -> OperationRoundResult:
+        """目标、等级、开关与实际模式均明确后才报告完成。"""
+        area = read_preset_area(self.ctx, self.last_screenshot, '手柄-页面文字', '恶名狩猎')
+        text = ''.join(area[1]).replace(' ', '') if area is not None else ''
+        if not hunt_title_selected(self.ctx, self.last_screenshot, self.target) or '挑战等级' not in text:
+            return self.round_fail('未确认目标挑战入口，未切换模式')
+        if '无报酬模式' in text and 'OFF' in text.upper() and re.search(r'剩余奖励次数[:：]?0/3', text):
+            return self.round_success('已确认无报酬模式')
+        if deep_hunt_enabled(self.ctx, self.last_screenshot) and '电量消耗' in text:
+            if not self._sent:
+                self.save_screenshot(prefix='macos_deep_before_disable')
+                self.ctx.controller.btn_tap('right_stick_click')
+                self._sent = True
+            return self.round_retry('等待深度追猎关闭', wait=1)
+        return self.round_fail('未确认深度模式，未发送切换')
+
+
 def deep_hunt_enabled(ctx: ZContext, screen: MatLike | None) -> bool:
     """独立开关区域识别ON，不从敌人介绍中的英文推断模式。"""
     area = read_preset_area(ctx, screen, '手柄-深度开关', '恶名狩猎')
