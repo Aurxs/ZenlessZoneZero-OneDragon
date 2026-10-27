@@ -53,6 +53,20 @@ class ZOneDragonApp(OneDragonApp, ZApplication):
             return ZApplication.execute(self)
         return OneDragonApp.execute(self)
 
+    @node_from(from_name='切换账号后处理', status=OneDragonApp.STATUS_NEXT)
+    @operation_node(name='运行应用组', is_start_node=True)
+    def run_group_app(self) -> OperationRoundResult:
+        """Mac 任务失败后恢复主界面，其他平台保留原应用组。"""
+        if sys.platform != 'darwin':
+            return OneDragonApp.run_group_app(self)
+        from zzz_od.operation.gamepad.application_group import GamepadGroupApplication
+
+        return self.round_by_op_result(GamepadGroupApplication(
+            ctx=self.ctx,
+            group_id=application_const.DEFAULT_GROUP_ID,
+            op_to_enter_game=self.op_to_enter_game,
+        ).execute())
+
     @node_from(from_name='运行应用组')
     @operation_node(name='切换实例配置', screenshot_before_round=False)
     def switch_instance(self) -> OperationRoundResult:
