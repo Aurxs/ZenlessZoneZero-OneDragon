@@ -1,3 +1,4 @@
+import sys
 import time
 from typing import ClassVar
 
@@ -12,7 +13,7 @@ from one_dragon.base.operation.operation_notify import NotifyTiming, node_notify
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
 from one_dragon.base.screen import screen_utils
 from one_dragon.base.screen.screen_utils import FindAreaResultEnum
-from one_dragon.utils import cv2_utils, str_utils
+from one_dragon.utils import cv2_utils, gpu_executor, str_utils
 from one_dragon.utils.i18_utils import gt
 from one_dragon.utils.log_utils import log
 from one_dragon.yolo.detect_utils import DetectFrameResult
@@ -61,6 +62,7 @@ from zzz_od.operation.zzz_operation import ZOperation
 
 
 class LostVoidRunLevel(ZOperation):
+    move_by_det_class: ClassVar[type[LostVoidMoveByDet]] = LostVoidMoveByDet
     STATUS_NEXT_LEVEL: ClassVar[str] = '进入下层'
     STATUS_COMPLETE: ClassVar[str] = '通关'
     STATUS_AGENT_DEAD: ClassVar[str] = '代理人阵亡'
@@ -311,7 +313,7 @@ class LostVoidRunLevel(ZOperation):
         # 优先处理感叹号
         if with_interact:
             self.nothing_times = 0
-            op = LostVoidMoveByDet(self.ctx, self.region_type, LostVoidDetector.CLASS_INTERACT,
+            op = self.move_by_det_class(self.ctx, self.region_type, LostVoidDetector.CLASS_INTERACT,
                                    stop_when_disappear=False,
                                    allow_arrival_by_interact_btn=self.boss_pre_battle,
                                    stuck_state=self.stuck_state)
@@ -341,7 +343,7 @@ class LostVoidRunLevel(ZOperation):
         # 处理白点移动
         if with_distance and not self.boss_pre_battle:
             self.nothing_times = 0
-            op = LostVoidMoveByDet(self.ctx, self.region_type, LostVoidDetector.CLASS_DISTANCE,
+            op = self.move_by_det_class(self.ctx, self.region_type, LostVoidDetector.CLASS_DISTANCE,
                                    stop_when_interact=False,
                                    stuck_state=self.stuck_state)
             op_result = op.execute()
@@ -367,7 +369,7 @@ class LostVoidRunLevel(ZOperation):
         # 处理下层入口
         if with_entry and not self.boss_pre_battle:
             self.nothing_times = 0
-            op = LostVoidMoveByDet(self.ctx, self.region_type, LostVoidDetector.CLASS_ENTRY,
+            op = self.move_by_det_class(self.ctx, self.region_type, LostVoidDetector.CLASS_ENTRY,
                                    stop_when_disappear=False, ignore_entry_list=self.had_been_list,
                                    stuck_state=self.stuck_state)
             op_result = op.execute()
@@ -1122,11 +1124,15 @@ class LostVoidRunLevel(ZOperation):
                 if self.region_type not in [LostVoidRegionType.ELITE, LostVoidRegionType.BOSS]:
                     try:
                         # 为了不随意打断战斗 这里的识别阈值要高一点
-                        frame_result: DetectFrameResult = self.detector.run(
-                            image=self.last_screenshot,
-                            conf=0.9,
-                            run_time=self.last_screenshot_time,
-                        )
+                        if sys.platform == 'darwin':
+                            frame_result = gpu_executor.submit(self.detector.run, image=self.last_screenshot,
+                                                               conf=0.9, run_time=self.last_screenshot_time).result()
+                        else:
+                            frame_result: DetectFrameResult = self.detector.run(
+                                image=self.last_screenshot,
+                                conf=0.9,
+                                run_time=self.last_screenshot_time,
+                            )
                         with_interact, with_distance, with_entry = self.detector.is_frame_with_all(frame_result)
                         if with_interact or with_distance or with_entry:
                             not_in_battle = True

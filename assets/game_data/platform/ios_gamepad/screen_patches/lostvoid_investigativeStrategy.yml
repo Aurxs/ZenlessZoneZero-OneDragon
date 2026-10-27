@@ -1,0 +1,27 @@
+screen_id: lostvoid_investigativeStrategy
+added_areas:
+- area_name: 手柄-标题
+  area_type: text
+  pc_rect:
+  - 830
+  - 55
+  - 1100
+  - 110
+  text: 请选择调查战略
+  lcs_percent: 0.85
+- area_name: 手柄-战略卡片
+  area_type: none
+  pc_rect:
+  - 40
+  - 200
+  - 1920
+  - 780
+- area_name: 手柄-确定
+  area_type: text
+  pc_rect:
+  - 830
+  - 960
+  - 1090
+  - 1030
+  text: 确定
+  lcs_percent: 0.9

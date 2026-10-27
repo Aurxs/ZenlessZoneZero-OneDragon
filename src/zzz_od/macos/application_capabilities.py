@@ -23,7 +23,7 @@ MACOS_CHARGE_PLAN_LIMITS: str = (
 )
 MACOS_APP_SUMMARY: str = (
     'Mac 已支持阿朔占卜、录像店、汀曼咖啡、体力计划、活跃度奖励、丽都周纪和丽都城募；'
-    '恶名狩猎已支持库萨里库，其他任务以卡片上的适配提示为准'
+    '恶名狩猎已支持库萨里库，迷失之地支持战线肃清悬赏任务，其他任务以卡片上的适配提示为准'
 )
 MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     application_const.ONE_DRAGON_APP_ID,
@@ -36,6 +36,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     'ridu_weekly',
     'notorious_hunt',
     'mouse_sensitivity_checker',
+    'lost_void',
 })
 
 
@@ -44,6 +45,7 @@ def get_macos_app_limits(app_id: str) -> str:
     return {
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
         'mouse_sensitivity_checker': 'Mac 在迷失之地入口层用唯一交互图标双向校准右摇杆，保存到当前账户；不修改 Windows 鼠标参数',
+        'lost_void': 'Mac 战线肃清悬赏任务：活性维持或0至12、原预备编队、金币商店、实际8000进度和领奖；0活性、编队1整链及领奖已验收，其他活性待实测；其他模式及血量购买尚未适配',
         'notorious_hunt': 'Mac 已验证库萨里库免费挑战、GUI 难度与编队、周期领奖；其他 Boss 和深度追猎尚未开放',
         'ridu_weekly': 'Mac 支持领取已完成九宫格积分与积分特赏，不代做周任务',
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,

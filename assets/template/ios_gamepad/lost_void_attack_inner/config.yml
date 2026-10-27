@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_attack_inner
+template_name: 迷失之地普攻内部图形
+template_shape: rectangle
+auto_mask: true
+point_list:
+- 1434, 948
+- 1476, 990

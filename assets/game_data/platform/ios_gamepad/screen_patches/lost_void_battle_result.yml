@@ -1,0 +1,33 @@
+screen_id: lost_void_battle_result
+added_areas:
+- area_name: 手柄-完成关卡
+  area_type: none
+  pc_rect:
+  - 845
+  - 520
+  - 1395
+  - 580
+- area_name: 手柄-结果底栏
+  area_type: none
+  pc_rect:
+  - 735
+  - 900
+  - 1880
+  - 1065
+- area_name: 手柄-最终S评级
+  area_type: template
+  pc_rect:
+  - 710
+  - 335
+  - 1215
+  - 815
+  template_sub_dir: ios_gamepad
+  template_id: lost_void_final_s
+  template_match_threshold: 0.9
+- area_name: 手柄-最终结晶
+  area_type: none
+  pc_rect:
+  - 1510
+  - 320
+  - 1820
+  - 465

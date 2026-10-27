@@ -1,0 +1,16 @@
+screen_id: hollow_zero_entry
+added_areas:
+- area_name: 手柄-调查标签
+  area_type: none
+  pc_rect:
+  - 1250
+  - 0
+  - 1910
+  - 110
+- area_name: 手柄-迷失之地入口
+  area_type: none
+  pc_rect:
+  - 240
+  - 790
+  - 660
+  - 970

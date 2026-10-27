@@ -190,8 +190,15 @@ class LostVoidContext:
                     to_detect_labels.append(label)
 
         if sys.platform == 'darwin':
-            return gpu_executor.submit(self.detector.run, screen, run_time=screenshot_time,
-                                       label_list=to_detect_labels).result()
+            from zzz_od.operation.gamepad.lost_void_detection import (
+                correct_npc_gear_markers,
+            )
+
+            frame = gpu_executor.submit(self.detector.run, screen, run_time=screenshot_time,
+                                        label_list=to_detect_labels).result()
+            return correct_npc_gear_markers(frame, self.ctx.tm, self.detector.idx_2_class[0],
+                                            ignore_interact=ignore_list is not None and any(
+                                                name in ignore_list for name in ('感叹号', 'NPC武备')))
         return self.ctx.lost_void.detector.run(screen, run_time=screenshot_time,
                                                label_list=to_detect_labels)
 

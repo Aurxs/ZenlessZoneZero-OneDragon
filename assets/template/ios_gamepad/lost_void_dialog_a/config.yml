@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_dialog_a
+template_name: 迷失之地对话推进A
+template_shape: circle
+auto_mask: true
+point_list:
+- 1483, 999
+- 1501, 999

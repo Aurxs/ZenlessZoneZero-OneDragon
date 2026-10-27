@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_npc_gear
+template_name: 迷失之地NPC武备盾牌
+template_shape: circle
+auto_mask: true
+point_list:
+- 259, 314
+- 297, 314

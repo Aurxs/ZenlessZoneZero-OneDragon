@@ -19,10 +19,11 @@ if TYPE_CHECKING:
 class GamepadChooseDialogOption(GamepadOperation):
     """逐帧移动选项，只报告已经确认的目标，不判断调用方业务完成。"""
 
-    def __init__(self, ctx: ZContext, option: str) -> None:
+    def __init__(self, ctx: ZContext, option: str, prompt_threshold: float = 0.85) -> None:
         """使用调用方指定的完整选项，不默认选择当前行。"""
         super().__init__(ctx, op_name=f'手柄对话选择 {option}', timeout_seconds=25)
         self.option: str = option
+        self.prompt_threshold: float = prompt_threshold
         self.evidence: dict[str, str] = {}
         self._confirm_sent: bool = False
         self._completed: bool = False
@@ -83,7 +84,7 @@ class GamepadChooseDialogOption(GamepadOperation):
         options: list[tuple[str, MatchResult]] = [
             (self._normalized(text), matches.max)
             for text, matches in results.items()
-            if len(self._normalized(text)) >= 2 and matches.max is not None
+            if self._normalized(text) not in ('', 'A') and matches.max is not None
             and matches.max.x >= 100
         ]
         target_name = self._normalized(gt(self.option, 'game'))
@@ -120,7 +121,7 @@ class GamepadChooseDialogOption(GamepadOperation):
         ]
         if not prompts:
             # 小图标在整段 OCR 中偶尔被漏检，用同一实拍 A 图标补充定位。
-            prompts = list(self.ctx.tm.match_template(image, 'ios_gamepad', 'dialog_a', threshold=0.85))
+            prompts = list(self.ctx.tm.match_template(image, 'ios_gamepad', 'dialog_a', threshold=self.prompt_threshold))
         if not any(prompt.x + prompt.w < current.x and self._same_row(prompt, current) for prompt in prompts):
             return self._fail('目标已高亮但同排 A 提示缺失，未确认')
         if not self._save('选项确认前'):

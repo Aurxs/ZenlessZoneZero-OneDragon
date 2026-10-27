@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_final_s
+template_name: 迷失之地最终S评级
+template_shape: rectangle
+auto_mask: true
+point_list:
+- 720, 345
+- 1205, 805

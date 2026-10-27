@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_periodic_tab
+template_name: 迷失之地手柄周期选中页签
+template_shape: rectangle
+auto_mask: true
+point_list:
+- 1410, 29
+- 1500, 76

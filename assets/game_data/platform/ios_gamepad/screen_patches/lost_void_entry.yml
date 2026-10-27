@@ -1,0 +1,67 @@
+screen_id: lost_void_entry
+added_areas:
+- area_name: 手柄-更新标题
+  area_type: text
+  pc_rect:
+  - 500
+  - 240
+  - 1000
+  - 320
+  text: 迷失之地内容更新
+  lcs_percent: 0.85
+- area_name: 手柄-更新返回
+  area_type: none
+  pc_rect:
+  - 900
+  - 880
+  - 1020
+  - 940
+- area_name: 手柄-入口标签
+  area_type: none
+  pc_rect:
+  - 1340
+  - 15
+  - 1730
+  - 90
+- area_name: 手柄-入口内容
+  area_type: none
+  pc_rect:
+  - 100
+  - 200
+  - 1810
+  - 880
+- area_name: 手柄-悬赏委托
+  area_type: none
+  pc_rect:
+  - 1030
+  - 15
+  - 1285
+  - 90
+- area_name: 手柄-悬赏面板标题
+  area_type: none
+  pc_rect:
+  - 330
+  - 200
+  - 560
+  - 280
+- area_name: 手柄-悬赏实际进度
+  area_type: none
+  pc_rect:
+  - 345
+  - 310
+  - 670
+  - 365
+- area_name: 手柄-悬赏奖励状态
+  area_type: none
+  pc_rect:
+  - 1300
+  - 385
+  - 1540
+  - 825
+- area_name: 手柄-悬赏底栏
+  area_type: none
+  pc_rect:
+  - 730
+  - 920
+  - 1230
+  - 990

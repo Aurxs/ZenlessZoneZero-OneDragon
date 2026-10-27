@@ -84,6 +84,8 @@ class AutoBattleContext:
 
         # 自动释放终结技开关
         self.auto_ultimate_enabled: bool = True  # 是否在终结技可用时自动释放
+        # 玩法临时提供同一普攻区域内的图标变体，结束时由调用方恢复。
+        self.normal_attack_template_variants: tuple[tuple[str, str], ...] = ()
 
     def init_auto_op(
         self,
@@ -1036,7 +1038,12 @@ class AutoBattleContext:
         part = cv2_utils.crop_image_only(screen, self.area_btn_normal.rect)
         mrl = self.ctx.tm.match_template(part, 'battle', 'btn_normal_attack',
                                          threshold=0.9)
-        return mrl.max is not None
+        if mrl.max is not None:
+            return True
+        return any(
+            self.ctx.tm.match_template(part, sub_dir, template_id, threshold=0.9).max is not None
+            for sub_dir, template_id in self.normal_attack_template_variants
+        )
 
     def start_context_async(self) -> None:
         """

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
+from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import gpu_executor
 from zzz_od.application.hollow_zero.lost_void.context.lost_void_detector import (
@@ -19,7 +21,12 @@ from zzz_od.operation.gamepad.transport_by_compendium import (
 
 if TYPE_CHECKING:
     from one_dragon.base.geometry.point import Point
+    from one_dragon.base.geometry.rectangle import Rect
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
+    from one_dragon.yolo.detect_utils import DetectFrameResult
+    from zzz_od.application.hollow_zero.lost_void.operation.lost_void_move_by_det import (
+        MoveTargetWrapper,
+    )
     from zzz_od.context.zzz_context import ZContext
 
 
@@ -89,6 +96,61 @@ class GamepadLostVoidCalibrateTurn(GamepadOperation):
 
 class GamepadLostVoidMoveByDet(LostVoidMoveByDet):
     """沿用目标、移动与脱困，仅将像素偏差转为有界右摇杆脉冲。"""
+
+    def handle_init(self) -> None:
+        """目标单独计时，避免其他远处图标闪烁使原脱困计数反复清零。"""
+        super().handle_init()
+        self._static_target: Rect | None = None
+        self._static_since: float = 0
+        self._last_encounter_check: float = 0
+
+    def _battle_encounter(self) -> OperationRoundResult | None:
+        """移动前优先复用扣血、红黄光与开战提示，不能让误识别的出口抢占战斗。"""
+        if self.last_screenshot is None or self.last_screenshot_time - self._last_encounter_check < 0.25:
+            return None
+        self._last_encounter_check = self.last_screenshot_time
+        if self.ctx.lost_void.in_normal_world(self.last_screenshot) and self.ctx.lost_void.check_battle_encounter(
+            self.last_screenshot, self.last_screenshot_time,
+        ):
+            self.ctx.controller.stop_moving_forward()
+            return self.round_success(self.STATUS_IN_BATTLE)
+        return None
+
+    @node_from(from_name='脱困', status=LostVoidMoveByDet.STATUS_CONTINUE)
+    @node_from(from_name='无目标处理', status=LostVoidMoveByDet.STATUS_CONTINUE)
+    @operation_node(name='移动前转向', node_max_retry_times=20, is_start_node=True)
+    def turn_at_first(self) -> OperationRoundResult:
+        """战斗信号优先于当前目标和转向。"""
+        encountered = self._battle_encounter()
+        return encountered if encountered is not None else super().turn_at_first()
+
+    @node_from(from_name='移动前转向', status='开始移动')
+    @operation_node(name='移动')
+    def move_towards(self) -> OperationRoundResult:
+        """白点接敌时直接交给父层开战，不继续追逐敌人头顶的错误分类。"""
+        encountered = self._battle_encounter()
+        return encountered if encountered is not None else super().move_towards()
+
+    def check_stuck(self, frame_result: DetectFrameResult, new_target: MoveTargetWrapper) -> OperationRoundResult | None:
+        """原脱困优先；当前目标位置和大小连续静止两秒也进入原脱困节点。"""
+        result = super().check_stuck(frame_result, new_target)
+        if result is not None:
+            self._static_target = None
+            return result
+        rect = new_target.entire_rect
+        old = self._static_target
+        now = time.monotonic()
+        if old is None or max(abs(rect.center.x - old.center.x), abs(rect.center.y - old.center.y),
+                              abs(rect.width - old.width), abs(rect.height - old.height)) > 16:
+            self._static_target = rect
+            self._static_since = now
+        elif now - self._static_since >= 2:
+            self.ctx.controller.stop_moving_forward()
+            self.stuck_state.stuck_times += 1
+            self._static_target = None
+            self._reset_stuck_status()
+            return self.round_fail('无法脱困') if self.stuck_state.stuck_times > 12 else self.round_success('尝试脱困')
+        return None
 
     def turn_to_target(self, target: Point, is_moving: bool = False, calibration_axis: str = 'x') -> bool:
         """短时低幅转向处理小偏差，避免原鼠标单位产生过短的满幅摇杆输入。"""

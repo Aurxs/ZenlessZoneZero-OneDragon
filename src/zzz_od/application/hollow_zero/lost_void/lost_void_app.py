@@ -1,3 +1,5 @@
+import re
+import sys
 import time
 from typing import ClassVar
 
@@ -38,7 +40,7 @@ from zzz_od.operation.deploy import Deploy
 
 class LostVoidApp(ZApplication):
 
-    """零号空洞-迷失之地:周限肉鸽玩法(与枯萎之都共享每周奖励次数)。周限、进入战斗、耗时较长。"""
+    """零号空洞迷失之地：挑战可重复，悬赏积分按周结算；会进入战斗。"""
     STATUS_ENOUGH_TIMES: ClassVar[str] = '完成通关次数'
     STATUS_AGAIN: ClassVar[str] = '继续挑战'
     STATUS_AGAIN_MATRIX: ClassVar[str] = '继续挑战-矩阵行动'
@@ -69,11 +71,14 @@ class LostVoidApp(ZApplication):
 
         # debug
         self.lost_void_debug = lost_void_debug
+        self._macos_claim_error: str | None = None
 
     @operation_node(name='初始化加载', is_start_node=True)
     def init_for_lost_void(self) -> OperationRoundResult:
+        if sys.platform == 'darwin' and self.config.mission_name != '战线肃清':
+            return self.round_fail('Mac 迷失之地当前仅支持战线肃清')
         # 检查分配给今天的任务是否完成
-        if self.run_record.is_finished_by_day:
+        if self.run_record.is_finished_by_day and not (sys.platform == 'darwin' and self.config.is_bounty_commission_mode):
             return self.round_success(LostVoidApp.STATUS_ENOUGH_TIMES)
 
         try:
@@ -88,6 +93,8 @@ class LostVoidApp(ZApplication):
     def check_initial_screen(self) -> OperationRoundResult:
         if self.lost_void_debug:
             return self.round_success('迷失之地-大世界')
+        if sys.platform == 'darwin':
+            return self.round_success('未识别初始画面')
         result = self.round_by_find_and_click_area(self.last_screenshot, '迷失之地-大世界', '按钮-挑战-确认')
         # 特殊兼容：在挑战区域开始，接力运行
         if result.is_success:
@@ -114,6 +121,10 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='识别初始画面', status='未识别初始画面')
     @operation_node(name='前往零号空洞-入口')
     def tp_to_lost_void(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void import GamepadLostVoidTransport
+
+            return self.round_by_op_result(GamepadLostVoidTransport(self.ctx).execute())
         op = TransportByCompendium(self.ctx,
                                    '作战',
                                    '周期征讨',
@@ -125,6 +136,8 @@ class LostVoidApp(ZApplication):
     @operation_node(name='前往迷失之地-入口', node_max_retry_times=20)
     def choose_lost_void_entry(self) -> OperationRoundResult:
         """前往迷失之地入口"""
+        if sys.platform == 'darwin':
+            return self._wait_for_lost_void_entry()
         result = self.round_by_ocr_and_click(self.last_screenshot, '迷失之地')
         if result.is_success:
             return self.round_retry('尝试进入迷失之地-入口', wait=1)
@@ -136,6 +149,13 @@ class LostVoidApp(ZApplication):
 
     def _wait_for_lost_void_entry(self) -> OperationRoundResult:
         """等待迷失之地入口加载完成。"""
+        if sys.platform == 'darwin':
+            if self.last_screenshot is None:
+                return self.round_retry('等待迷失之地入口截图', wait=1)
+            current = self.check_and_update_current_screen(self.last_screenshot, screen_name_list=[
+                '迷失之地-入口-周期', '迷失之地-入口-常规',
+            ])
+            return self.round_success(current) if current is not None else self.round_retry('等待迷失之地入口', wait=1)
         result = self.round_by_find_and_click_area(self.last_screenshot, '迷失之地-入口', '按钮-更新弹窗-关闭')
         if result.is_success:
             return self.round_retry(result.status, wait=0.5)
@@ -159,6 +179,20 @@ class LostVoidApp(ZApplication):
 
         :return: 操作结果
         """
+        if sys.platform == 'darwin' and self.config.is_bounty_commission_mode:
+            if self.last_screenshot is None:
+                return self.round_retry('等待悬赏进度截图', wait=1)
+            area = self.ctx.screen_loader.get_area('迷失之地-入口', '区域-悬赏委托-进度')
+            words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+            values = {int(match[1]) for text in words
+                      if (match := re.search(r'(?<!\d)(\d{1,4})\s*/\s*8000(?!\d)', text)) is not None}
+            if len(values) != 1 or not 0 <= next(iter(values)) <= 8000:
+                return self.round_retry('未读到唯一实际悬赏进度', wait=1)
+            score = next(iter(values))
+            self.save_screenshot(prefix='macos_lost_void_bounty_progress')
+            self.run_record.bounty_commission_complete = score == 8000
+            return self.round_success(self.STATUS_ENOUGH_TIMES if score == 8000 else self.STATUS_AGAIN,
+                                      data={'bounty_score': score, 'maximum': 8000})
         if not self.config.is_bounty_commission_mode:
             if self.run_record.is_finished_by_day:
                 return self.round_success(LostVoidApp.STATUS_ENOUGH_TIMES)
@@ -439,6 +473,10 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='识别悬赏委托完成进度', status=STATUS_AGAIN)
     @operation_node(name='前往副本画面')
     def goto_mission_screen(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void import GamepadLostVoidChooseMission
+
+            return self.round_by_op_result(GamepadLostVoidChooseMission(self.ctx, self.config.mission_name).execute())
         return self.round_by_goto_screen(screen_name=f'迷失之地-{self.config.mission_name}')
 
     @node_from(from_name='前往副本画面')
@@ -472,12 +510,18 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='副本画面识别')
     @operation_node(name='打开调查战略列表')
     def open_strategy_list(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void import GamepadLostVoidOpenStrategy
+
+            return self.round_by_op_result(GamepadLostVoidOpenStrategy(self.ctx, self.config.mission_name).execute())
         return self.round_by_click_area('迷失之地-战线肃清', '按钮-调查战略',
                                         success_wait=1, retry_wait=1)
 
     @node_from(from_name='打开调查战略列表')
     @operation_node(name='选择调查战略')
     def choose_strategy(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success('手柄调查战略已核对')
         current_screen_name = self.check_and_update_current_screen(
             self.last_screenshot, screen_name_list=['迷失之地-战线肃清', '迷失之地-特遣调查']
         )
@@ -652,6 +696,16 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='选择调查战略')
     @operation_node(name='选择周期增益')
     def choose_buff(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void import GamepadLostVoidChooseBuff
+            from zzz_od.operation.gamepad.lost_void_activity import (
+                GamepadLostVoidSetActivity,
+            )
+
+            result = GamepadLostVoidChooseBuff(self.ctx, self.ctx.lost_void.challenge_config.period_buff_no).execute()
+            if not result.success:
+                return self.round_by_op_result(result)
+            return self.round_by_op_result(GamepadLostVoidSetActivity(self.ctx, self.config.ether_activity).execute())
         mission_name = self.config.mission_name
         if mission_name == '特遣调查':
             return self.round_success(status='无需选择')
@@ -664,6 +718,10 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='选择周期增益')
     @operation_node(name='下一步')
     def click_next(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void import GamepadLostVoidPrepareTeam
+
+            return self.round_by_op_result(GamepadLostVoidPrepareTeam(self.ctx).execute())
         return self.round_by_find_and_click_area(screen_name='通用-出战', area_name='按钮-下一步',
                                                  until_find_all=[('通用-出战', '按钮-出战')],
                                                  success_wait=1, retry_wait=1)
@@ -715,6 +773,12 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='检查预备编队', status='需选择预备编队')
     @operation_node(name='选择预备编队')
     def choose_predefined_team(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.predefined_team import (
+                GamepadChoosePredefinedTeam,
+            )
+
+            return self.round_by_op_result(GamepadChoosePredefinedTeam(self.ctx, self.ctx.lost_void.predefined_team_idx).execute())
         op = ChoosePredefinedTeam(self.ctx, target_team_idx_list=[self.ctx.lost_void.predefined_team_idx])
         return self.round_by_op_result(op.execute())
 
@@ -723,6 +787,15 @@ class LostVoidApp(ZApplication):
     @operation_node(name='出战')
     def deploy(self) -> OperationRoundResult:
         self.next_region_type = LostVoidRegionType.ENTRY
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void_run_level import (
+                GamepadLostVoidDeploy,
+            )
+
+            return self.round_by_op_result(GamepadLostVoidDeploy(
+                self.ctx, self.ctx.lost_void.get_auto_op_name(), self.ctx.lost_void.predefined_team_idx,
+                prepare_only=False, explore_first_level=False,
+            ).execute())
         op = Deploy(self.ctx)
         return self.round_by_op_result(op.execute())
 
@@ -742,7 +815,14 @@ class LostVoidApp(ZApplication):
     @operation_node(name='层间移动')
     def run_level(self) -> OperationRoundResult:
         log.info(f'推测楼层类型 {self.next_region_type.value.value}')
-        op = LostVoidRunLevel(self.ctx, self.next_region_type)
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void_run_level import (
+                GamepadLostVoidRunLevel,
+            )
+
+            op = GamepadLostVoidRunLevel(self.ctx, self.next_region_type)
+        else:
+            op = LostVoidRunLevel(self.ctx, self.next_region_type)
         op_result = op.execute()
         if op_result.success:
             if op_result.status == LostVoidRunLevel.STATUS_NEXT_LEVEL:
@@ -758,7 +838,7 @@ class LostVoidApp(ZApplication):
         return self.round_by_op_result(op_result)
 
     @node_from(from_name='层间移动', status=LostVoidRunLevel.STATUS_COMPLETE)
-    @operation_node(name='通关后处理')
+    @operation_node(name='通关后处理', node_max_retry_times=20)
     def after_complete(self) -> OperationRoundResult:
         result = self._wait_for_lost_void_entry()
         if not result.is_success:
@@ -789,6 +869,12 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='识别悬赏委托完成进度', status=STATUS_ENOUGH_TIMES)
     @operation_node(name='打开悬赏委托')
     def open_reward_list(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void_rewards import (
+                GamepadLostVoidOpenBounty,
+            )
+
+            return self.round_by_op_result(GamepadLostVoidOpenBounty(self.ctx).execute())
         return self.round_by_find_and_click_area(screen_name='迷失之地-入口', area_name='按钮-悬赏委托',
                                                  until_not_find_all=[('迷失之地-入口', '按钮-悬赏委托')],
                                                  success_wait=1, retry_wait=1)
@@ -797,6 +883,15 @@ class LostVoidApp(ZApplication):
     @node_notify(when=NotifyTiming.CURRENT_DONE)
     @operation_node(name='全部领取', node_max_retry_times=2)
     def claim_all(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void_rewards import (
+                GamepadLostVoidClaimBounty,
+            )
+
+            result = GamepadLostVoidClaimBounty(self.ctx).execute()
+            if not result.success:
+                self._macos_claim_error = result.status or '迷失之地悬赏领取未确认'
+            return self.round_by_op_result(result)
         return self.round_by_find_and_click_area(screen_name='迷失之地-入口', area_name='按钮-悬赏委托-全部领取',
                                                  success_wait=1, retry_wait=0.5)
 
@@ -804,6 +899,13 @@ class LostVoidApp(ZApplication):
     @node_from(from_name='全部领取', success=False)
     @operation_node(name='完成后返回')
     def back_at_last(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.lost_void import GamepadLostVoidBackToWorld
+
+            result = GamepadLostVoidBackToWorld(self.ctx).execute()
+            if not result.success:
+                return self.round_by_op_result(result)
+            return self.round_fail(self._macos_claim_error) if self._macos_claim_error else self.round_by_op_result(result)
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())
 

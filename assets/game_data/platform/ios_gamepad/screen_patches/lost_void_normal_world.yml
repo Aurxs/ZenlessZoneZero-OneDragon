@@ -7,3 +7,77 @@ added_areas:
   - 990
   - 1900
   - 1050
+- area_name: 手柄-退出确认
+  area_type: none
+  pc_rect:
+  - 660
+  - 480
+  - 1280
+  - 740
+- area_name: 手柄-对话框
+  area_type: none
+  pc_rect:
+  - 390
+  - 780
+  - 1530
+  - 1040
+- area_name: 手柄-对话推进
+  area_type: template
+  pc_rect:
+  - 1455
+  - 971
+  - 1511
+  - 1027
+  template_sub_dir: ios_gamepad
+  template_id: lost_void_dialog_a
+  template_match_threshold: 0.85
+- area_name: 手柄-挑战说明
+  area_type: none
+  pc_rect:
+  - 550
+  - 470
+  - 1370
+  - 565
+- area_name: 手柄-挑战确认
+  area_type: none
+  pc_rect:
+  - 790
+  - 585
+  - 1120
+  - 675
+- area_name: 手柄-挑战选择提示
+  area_type: none
+  pc_rect:
+  - 890
+  - 680
+  - 1040
+  - 740
+- area_name: 手柄-调查完成
+  area_type: text
+  pc_rect:
+  - 340
+  - 470
+  - 1570
+  - 625
+  text: INVESTIGATION COMPLETE
+  lcs_percent: 0.75
+- area_name: 手柄-普攻内部图形
+  area_type: template
+  pc_rect:
+  - 1403
+  - 916
+  - 1505
+  - 1017
+  template_sub_dir: ios_gamepad
+  template_id: lost_void_attack_inner
+  template_match_threshold: 0.9
+- area_name: 手柄-NPC武备标记
+  area_type: template
+  pc_rect:
+  - 0
+  - 110
+  - 1920
+  - 900
+  template_sub_dir: ios_gamepad
+  template_id: lost_void_npc_gear
+  template_match_threshold: 0.8

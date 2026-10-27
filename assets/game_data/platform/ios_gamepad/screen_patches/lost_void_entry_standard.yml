@@ -1,0 +1,9 @@
+screen_id: lost_void_entry_standard
+area_patches:
+  作战潜能:
+    lcs_percent: 0.8
+    pc_rect:
+    - 825
+    - 990
+    - 980
+    - 1065

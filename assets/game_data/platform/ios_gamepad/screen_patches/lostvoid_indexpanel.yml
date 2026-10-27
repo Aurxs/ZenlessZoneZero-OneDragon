@@ -1,0 +1,9 @@
+screen_id: lostvoid_indexpanel
+added_areas:
+- area_name: 手柄-页签
+  area_type: none
+  pc_rect:
+  - 190
+  - 0
+  - 1090
+  - 100
