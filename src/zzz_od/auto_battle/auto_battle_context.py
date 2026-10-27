@@ -1059,6 +1059,10 @@ class AutoBattleContext:
         """
         self.dodge_context.stop_context()
 
+        # 命令行预览或初始化失败时尚未创建控制器，仍需允许上层清理线程池。
+        if self.ctx.controller is None:
+            return
+
         log.info('松开所有按键')
         self._release_keys()
         self.switch_next(release=True)
