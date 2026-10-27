@@ -8,6 +8,7 @@ import numpy as np
 
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
+from zzz_od.operation.gamepad.focus import highlight_mask
 from zzz_od.operation.gamepad.rewards import (
     GamepadOpenRiduWeekly,
     _GamepadRewardOperation,
@@ -89,6 +90,16 @@ class GamepadRiduWeekly(_GamepadRewardOperation):
         for index, texts in enumerate(words, start=1):
             if any(text == '完成' or 'BINGO' in text.upper().replace('0', 'O') for text in texts):
                 completed.append(index)
+                continue
+            # 可领格底部为黄绿色填充，优先于易漏读的进度；输入前仍核对详情领取提示。
+            row, column = divmod(index - 1, 3)
+            height, width = image.shape[:2]
+            band = image[
+                int((row + 0.81) * height / 3):int((row + 0.94) * height / 3),
+                int((column + 0.12) * width / 3):int((column + 0.88) * width / 3),
+            ]
+            if band.size and np.count_nonzero(highlight_mask(band, 'yellow')) / band.shape[0] / band.shape[1] >= 0.35:
+                claimable.append(index)
                 continue
             progress = [re.search(r'(\d+)\s*/\s*(\d+)', text) for text in texts]
             values = {(int(match[1]), int(match[2])) for match in progress if match is not None}
