@@ -43,6 +43,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
 def get_macos_app_limits(app_id: str) -> str:
     """让每个任务显示自身范围，避免商店按钮误显示战斗限制。"""
     return {
+        'intel_board': 'Mac 手柄流程开发检查点：专业挑战和库萨里库单场已验，冥宁芙·双子当前队伍失败；完整周期及预备编队待验，暂未开放运行',
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
         'mouse_sensitivity_checker': 'Mac 在迷失之地入口层用唯一交互图标双向校准右摇杆，保存到当前账户；不修改 Windows 鼠标参数',
         'lost_void': 'Mac 战线肃清悬赏任务：活性维持或0至12、原预备编队、金币商店、实际8000进度和领奖；0活性、编队1整链及领奖已验收，其他活性待实测；其他模式及血量购买尚未适配',
@@ -60,6 +61,8 @@ def get_macos_app_unavailable_reason(app_id: str) -> str | None:
     """只限制 Mac 运行，不更改应用注册、顺序与启用状态。"""
     if sys.platform != 'darwin' or app_id in MACOS_SUPPORTED_APP_IDS:
         return None
+    if app_id == 'intel_board':
+        return 'Mac情报板周期验收待队伍条件，暂未开放运行'
     return 'Mac暂未适配，此应用仍可查看和配置'
 
 

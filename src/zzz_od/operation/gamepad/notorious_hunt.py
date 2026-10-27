@@ -17,11 +17,13 @@ from zzz_od.operation.gamepad.focus import (
     text_inside_frame,
 )
 from zzz_od.operation.gamepad.gamepad_operation import GamepadOperation
+from zzz_od.operation.gamepad.transport import find_yellow_focus_frames
 from zzz_od.operation.gamepad.transport_by_compendium import (
     GamepadTransportByCompendium,
 )
 
 if TYPE_CHECKING:
+    from one_dragon.base.geometry.rectangle import Rect
     from one_dragon.base.operation.operation_base import OperationResult
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.application.charge_plan.charge_plan_config import ChargePlanItem
@@ -393,8 +395,19 @@ class GamepadNotoriousHuntMove(NotoriousHuntMove):
 
     def __init__(self, ctx: ZContext, buff_num: int = 1) -> None:
         """保留原鸣徽选项与移动计数。"""
+        from zzz_od.operation.gamepad.lost_void_common import (
+            GamepadLostVoidChooseCommon,
+        )
+
         super().__init__(ctx, buff_num)
         self._battle_guide: GamepadBattleGuide = GamepadBattleGuide()
+        self._buff_parser: GamepadLostVoidChooseCommon = GamepadLostVoidChooseCommon(ctx)
+        self._buff_confirmed: bool = False
+
+    def _buff_names(self) -> list[Rect]:
+        """复用通用鸣徽黑色名称栏，不依赖随机鸣徽名。"""
+        self._buff_parser.last_screenshot = self.last_screenshot
+        return self._buff_parser.name_rects()
 
     def _move_by_hint(self) -> OperationRoundResult:
         """各 Boss 统一处理可选引导，其余移动沿用上游算法。"""
@@ -404,7 +417,48 @@ class GamepadNotoriousHuntMove(NotoriousHuntMove):
             if result.is_fail:
                 return result
             return self.round_wait(result.status, wait=1)
+        if len(self._buff_names()) == 3:
+            return self.choose_buff()
         return super()._move_by_hint()
+
+    @node_from(from_name='交互')
+    @operation_node(name='选择', node_max_retry_times=10)
+    def choose_buff(self) -> OperationRoundResult:
+        """按原从左到右序号选择，整卡唯一焦点匹配后才按 A。"""
+        names = self._buff_names()
+        if len(names) == 3:
+            frames = find_yellow_focus_frames(self.last_screenshot, 300, 430, 450, 600)
+            selected = [i for i, rect in enumerate(names) for frame in frames
+                        if frame.x1 < rect.center.x < frame.x2 and frame.y1 < rect.center.y < frame.y2]
+            if len(selected) != 1:
+                return self.round_retry('等待鸣徽唯一黄色焦点', wait=1)
+            if self._buff_confirmed:
+                return self.round_retry('等待鸣徽确认后返回', wait=1)
+            target = self.buff_num - 1 if 1 <= self.buff_num <= len(names) else 0
+            if selected[0] == target:
+                self.save_screenshot(prefix='macos_hunt_buff_selected')
+                self.ctx.controller.btn_tap('south')
+                self._buff_confirmed = True
+            else:
+                self.ctx.controller.btn_tap('dpad_right' if selected[0] < target else 'dpad_left')
+            return self.round_wait('等待计划鸣徽选中', wait=max(1, self.ctx.macos_config.menu_action_interval_ms / 1000))
+        if self.ctx.auto_battle_context.is_normal_attack_btn_available(self.last_screenshot) or self.round_by_find_area(
+            self.last_screenshot, '战斗画面', '按键-交互',
+        ).is_success:
+            return self.round_success()
+        return self.round_retry('等待已识别的鸣徽选择页', wait=1)
+
+    @node_from(from_name='移动靠近交互', status='标识-BOSS血条')
+    @node_from(from_name='选择', success=False)
+    @node_from(from_name='选择后移动')
+    @operation_node(name='移动完成', node_max_retry_times=3)
+    def move_done(self) -> OperationRoundResult:
+        """选择失败不能沿父流程的兜底边当作接敌成功。"""
+        if self.previous_node.name == '选择' and not self.previous_node.is_success:
+            return self.round_fail('鸣徽选择失败，未开始自动战斗')
+        if self.round_by_find_area(self.last_screenshot, '恶名狩猎', '标识-BOSS血条').is_success:
+            return self.round_success()
+        return self.round_retry('等待接敌后的 Boss 血条', wait=1)
 
 
 class GamepadHuntBattle(GamepadOperation):

@@ -1,0 +1,24 @@
+screen_id: function_guide
+screen:
+  screen_id: function_guide
+  screen_name: 功能导览
+  pc_alt: false
+  area_list:
+  - area_name: 手柄-卡片
+    area_type: text
+    pc_rect:
+    - 1250
+    - 275
+    - 1800
+    - 960
+    lcs_percent: 0.5
+  - area_name: 标题
+    area_type: text
+    id_mark: true
+    pc_rect:
+    - 1380
+    - 115
+    - 1820
+    - 205
+    text: FUNCTIONS
+    lcs_percent: 0.8

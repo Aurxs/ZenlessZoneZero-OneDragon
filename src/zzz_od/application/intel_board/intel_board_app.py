@@ -1,4 +1,6 @@
+import sys
 from enum import StrEnum
+from typing import ClassVar
 
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation_edge import node_from
@@ -18,6 +20,7 @@ from zzz_od.context.zzz_context import ZContext
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
 from zzz_od.operation.choose_predefined_team import ChoosePredefinedTeam
 from zzz_od.operation.compendium.notorious_hunt_move import NotoriousHuntMove
+from zzz_od.operation.gamepad.gamepad_operation import GamepadMenuDelayMixin
 from zzz_od.operation.transport import Transport
 
 
@@ -27,9 +30,11 @@ class CommissionType(StrEnum):
     NOTORIOUS_HUNT = '恶名狩猎'
 
 
-class IntelBoardApp(ZApplication):
+class IntelBoardApp(GamepadMenuDelayMixin, ZApplication):
 
     """情报板:刷新/筛选动态情报板的代行委托(恶名狩猎/专业挑战室),代行出战清理板面。代行他人委托不耗自身电量(获贡献点;这些玩法自行挑战消耗电量)。"""
+    realtime_nodes: ClassVar[frozenset[str]] = frozenset({'战斗中'})
+
     def __init__(self, ctx: ZContext):
         ZApplication.__init__(
             self,
@@ -46,6 +51,15 @@ class IntelBoardApp(ZApplication):
         self.scroll_times: int = 0
         self.current_commission_type: CommissionType | None = None
         self.has_filtered: bool = False
+        self._macos_battle_won: bool | None = None
+
+    def handle_init(self) -> None:
+        """新运行重新筛选，不把上一次界面状态带入本次。"""
+        if sys.platform == 'darwin':
+            self.has_filtered = False
+            self.current_commission_type = None
+            self._macos_battle_won = None
+            self.scroll_times = 0
 
     @operation_node(name='初始化加载', is_start_node=True)
     def init_for_intel_board(self) -> OperationRoundResult:
@@ -58,6 +72,8 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='初始化加载')
     @operation_node(name='返回录像店')
     def back_to_world(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         op = Transport(self.ctx, '录像店', '房间')
         return self.round_by_op_result(op.execute())
 
@@ -70,6 +86,22 @@ class IntelBoardApp(ZApplication):
         elif self.run_record.progress_complete:
             return self.round_success('本周期已完成')
 
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import (
+                GamepadIntelNextStep,
+                GamepadOpenIntelBoard,
+            )
+
+            navigation = GamepadIntelNextStep(self.ctx)
+            navigation.last_screenshot = self.last_screenshot
+            area = navigation._read_area('情报板', '手柄-挑战入口')
+            text = ''.join(area[1]).replace(' ', '') if area is not None else ''
+            if '委托代行中' in text and 'ON' in text.upper():
+                self.current_commission_type = CommissionType.NOTORIOUS_HUNT if '无报酬模式' in text else CommissionType.EXPERT_CHALLENGE
+                return self.round_success('代行入口恢复')
+
+            return self.round_by_op_result(GamepadOpenIntelBoard(self.ctx).execute())
+
         # 1. 识别并点击大世界-功能导览按钮
         return self.round_by_find_and_click_area(
             screen_name='大世界-普通',
@@ -81,6 +113,8 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='打开情报板')
     @operation_node(name='点击情报板')
     def click_board(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         # 2. OCR 点击情报板
         return self.round_by_ocr_and_click(self.last_screenshot, '情报板', success_wait=1, retry_wait=1)
 
@@ -89,6 +123,10 @@ class IntelBoardApp(ZApplication):
     @operation_node(name='刷新委托')
     def refresh_commission(self) -> OperationRoundResult:
         self.scroll_times = 0
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelRefresh
+
+            return self.round_by_op_result(GamepadIntelRefresh(self.ctx).execute()) if self.has_filtered else self.round_success('未筛选')
         if self.has_filtered:
             return self.round_by_find_and_click_area(
                 screen_name='情报板', area_name='刷新按钮',
@@ -100,6 +138,10 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='刷新委托', status='未筛选')
     @operation_node(name='打开筛选', node_max_retry_times=60)
     def open_filter(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelBoardFilter
+
+            return self.round_by_op_result(GamepadIntelBoardFilter(self.ctx).execute())
         result = self.round_by_find_area(self.last_screenshot, '情报板', '点数兑换')
         if result.is_success:
             return self.round_by_click_area(
@@ -112,12 +154,16 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='打开筛选')
     @operation_node(name='重置筛选')
     def reset_filter(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         area = self.ctx.screen_loader.get_area('情报板', '重置按钮')
         return self.round_by_ocr_and_click(self.last_screenshot, '重置', area, success_wait=0.5, retry_wait=0.5)
 
     @node_from(from_name='重置筛选')
     @operation_node(name='选择恶名狩猎')
     def select_notorious_hunt(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         search_area = self.ctx.screen_loader.get_area('情报板', '搜索区域')
         return self.round_by_ocr_and_click(self.last_screenshot, '恶名狩猎', area=search_area,
                                            success_wait=0.5, retry_wait=0.5)
@@ -125,6 +171,8 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='选择恶名狩猎')
     @operation_node(name='选择专业挑战室')
     def select_expert_challenge(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         search_area = self.ctx.screen_loader.get_area('情报板', '搜索区域')
         return self.round_by_ocr_and_click(self.last_screenshot, '专业挑战室', area=search_area,
                                            success_wait=0.5, retry_wait=0.5)
@@ -132,6 +180,9 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='选择专业挑战室')
     @operation_node(name='关闭筛选')
     def close_filter(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            self.has_filtered = True
+            return self.round_success()
         self.has_filtered = True
         return self.round_by_click_area('情报板', '关闭筛选', success_wait=1)
 
@@ -141,6 +192,15 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='接取失败')
     @operation_node(name='寻找委托')
     def find_commission(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import (
+                GamepadChooseIntelCommission,
+            )
+
+            result = GamepadChooseIntelCommission(self.ctx).execute()
+            if result.success:
+                self.current_commission_type = CommissionType(result.data['commission_type'])
+            return self.round_by_op_result(result)
         # OCR 识别委托类型 按 y 坐标排序
         commission_values = {e.value for e in CommissionType}
         ocr_results = self.ctx.ocr.ocr(self.last_screenshot)
@@ -187,6 +247,12 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='寻找委托')
     @operation_node(name='接取委托')
     def accept_commission(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import (
+                GamepadAcceptIntelCommission,
+            )
+
+            return self.round_by_op_result(GamepadAcceptIntelCommission(self.ctx).execute())
 
         return self.round_by_ocr_and_click_with_action(
             target_action_list=[
@@ -200,8 +266,13 @@ class IntelBoardApp(ZApplication):
         )
 
     @node_from(from_name='接取委托')
+    @node_from(from_name='打开情报板', status='代行入口恢复')
     @operation_node(name='下一步')
     def next_step(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelNextStep
+
+            return self.round_by_op_result(GamepadIntelNextStep(self.ctx).execute())
         # 7. 持续点击下一步直到出现预备编队页面 需要先选编队再出战
         result = self.round_by_ocr(self.last_screenshot, '预备编队')
         if result.is_success:
@@ -231,6 +302,12 @@ class IntelBoardApp(ZApplication):
         # 8. 选择预备编队 无需选择时直接跳过
         if self.config.predefined_team_idx == -1:
             return self.round_success('无需选择预备编队')
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.predefined_team import (
+                GamepadChoosePredefinedTeam,
+            )
+
+            return self.round_by_op_result(GamepadChoosePredefinedTeam(self.ctx, self.config.predefined_team_idx).execute())
         op = ChoosePredefinedTeam(self.ctx, [self.config.predefined_team_idx])
         return self.round_by_op_result(op.execute())
 
@@ -238,12 +315,18 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='选择任意预备编队')
     @operation_node(name='点击出战')
     def click_deploy(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelDeploy
+
+            return self.round_by_op_result(GamepadIntelDeploy(self.ctx).execute())
         # 9. 编队选择完成后点击出战进入战斗
         return self.round_by_ocr_and_click(self.last_screenshot, '出战', success_wait=1, retry_wait=1)
 
     @node_from(from_name='点击出战')
     @operation_node(name='委托代行中弹窗')
     def click_commission_agent(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success('无弹窗')
         # 点击委托代行中弹窗的确定按钮（如果有的话）
         result = self.round_by_ocr(self.last_screenshot, '至少选择1位代理人出战')
         if result.is_success:
@@ -262,6 +345,12 @@ class IntelBoardApp(ZApplication):
     def choose_any_predefined_team(self) -> OperationRoundResult:
         fallback_team = self.ctx.team_config.team_list[0]
         log.warning(f'因未选择预备编队，当前副本没有代理人出战，使用预备编队 {fallback_team.name} 重新出战')
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.predefined_team import (
+                GamepadChoosePredefinedTeam,
+            )
+
+            return self.round_by_op_result(GamepadChoosePredefinedTeam(self.ctx, fallback_team.idx).execute())
         op = ChoosePredefinedTeam(self.ctx, [fallback_team.idx])
         return self.round_by_op_result(op.execute())
 
@@ -294,6 +383,10 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='等待战斗画面加载')
     @operation_node(name='战斗前移动')
     def pre_battle_move(self) -> OperationRoundResult:
+        if sys.platform == 'darwin' and self.current_commission_type == CommissionType.NOTORIOUS_HUNT:
+            from zzz_od.operation.gamepad.notorious_hunt import GamepadHuntApproach
+
+            return self.round_by_op_result(GamepadHuntApproach(self.ctx, 3).execute())
         # 12. 根据委托类型选择移动方式
         if self.current_commission_type == CommissionType.NOTORIOUS_HUNT:
             op = NotoriousHuntMove(self.ctx, 3)
@@ -306,6 +399,12 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='战斗前移动')
     @operation_node(name='开始自动战斗')
     def start_auto_battle(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelBattle
+
+            result = GamepadIntelBattle(self.ctx).execute()
+            self._macos_battle_won = result.data['won'] if result.success else None
+            return self.round_by_op_result(result)
         # 13. 启动自动战斗
         self.ctx.auto_battle_context.start_auto_battle()
         return self.round_success()
@@ -313,6 +412,8 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='开始自动战斗')
     @operation_node(name='战斗中', mute=True, timeout_seconds=600)
     def auto_battle(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success()
         if self.ctx.auto_battle_context.last_check_end_result is not None:
             self.ctx.auto_battle_context.stop_auto_battle()
             return self.round_success(status=self.ctx.auto_battle_context.last_check_end_result)
@@ -330,6 +431,8 @@ class IntelBoardApp(ZApplication):
     def check_back_to_list(self) -> OperationRoundResult:
         result = self.round_by_ocr(self.last_screenshot, '周期内可获取')
         if result.is_success:
+            if sys.platform == 'darwin' and self.current_commission_type is not None and self._macos_battle_won is not True:
+                return self.round_success('代行失败')
             if self.current_commission_type == CommissionType.EXPERT_CHALLENGE:
                 self.run_record.expert_challenge_count += 1
             elif self.current_commission_type == CommissionType.NOTORIOUS_HUNT:
@@ -338,9 +441,26 @@ class IntelBoardApp(ZApplication):
             return self.round_success('结算完成')
         return self.round_fail('未回到列表')
 
+    @node_from(from_name='检查回到委托列表', status='代行失败')
+    @node_from(from_name='点击结算按钮', status='代行失败')
+    @operation_node(name='代行失败终止')
+    def fail_commission(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelBackToWorld
+
+            result = GamepadIntelBackToWorld(self.ctx).execute()
+            if not result.success:
+                return self.round_by_op_result(result)
+            return self.round_fail('代行挑战失败，已返回大世界，未增加完成次数')
+        return self.round_fail('代行挑战失败，未增加完成次数')
+
     @node_from(from_name='检查回到委托列表', success=False)
     @operation_node(name='点击结算按钮', node_max_retry_times=60)
     def click_settlement_button(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelSettlement
+
+            return self.round_by_op_result(GamepadIntelSettlement(self.ctx).execute())
         result = self.round_by_ocr_and_click_with_action(
             target_action_list=[
                 ('完成', OperationRoundResultEnum.WAIT),
@@ -411,6 +531,10 @@ class IntelBoardApp(ZApplication):
     @node_from(from_name='结束处理')
     @operation_node(name='完成后返回大世界')
     def back_afterwards(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.intel_board import GamepadIntelBackToWorld
+
+            return self.round_by_op_result(GamepadIntelBackToWorld(self.ctx).execute())
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())
 

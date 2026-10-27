@@ -1,0 +1,116 @@
+screen_id: intel_board
+added_areas:
+- area_name: 手柄-顶部标签
+  area_type: text
+  pc_rect:
+  - 1030
+  - 20
+  - 1905
+  - 105
+  lcs_percent: 0.5
+- area_name: 手柄-底部提示
+  area_type: text
+  pc_rect:
+  - 25
+  - 970
+  - 1900
+  - 1080
+  lcs_percent: 0.5
+- area_name: 手柄-委托卡片
+  area_type: text
+  pc_rect:
+  - 65
+  - 120
+  - 1850
+  - 970
+  lcs_percent: 0.5
+- area_name: 手柄-刷新焦点
+  area_type: none
+  pc_rect:
+  - 790
+  - 990
+  - 875
+  - 1075
+- area_name: 手柄-筛选焦点
+  area_type: none
+  pc_rect:
+  - 875
+  - 990
+  - 955
+  - 1075
+- area_name: 手柄-筛选标题
+  area_type: text
+  pc_rect:
+  - 1270
+  - 25
+  - 1470
+  - 100
+  text: 委托筛选
+  lcs_percent: 0.8
+- area_name: 手柄-筛选条件
+  area_type: text
+  pc_rect:
+  - 1275
+  - 280
+  - 1850
+  - 800
+  lcs_percent: 0.5
+- area_name: 手柄-委托详情
+  area_type: text
+  pc_rect:
+  - 500
+  - 150
+  - 1850
+  - 1000
+  lcs_percent: 0.5
+- area_name: 手柄-挑战入口
+  area_type: text
+  pc_rect:
+  - 1150
+  - 900
+  - 1900
+  - 1080
+  lcs_percent: 0.5
+- area_name: 手柄-弹窗
+  area_type: text
+  pc_rect:
+  - 500
+  - 300
+  - 1420
+  - 790
+  lcs_percent: 0.5
+- area_name: 手柄-列表标识
+  area_type: text
+  id_mark: true
+  pc_rect:
+  - 185
+  - 1015
+  - 345
+  - 1070
+  text: 周期内可获取
+  lcs_percent: 0.9
+- area_name: 手柄-深度追猎
+  area_type: text
+  pc_rect:
+  - 1370
+  - 665
+  - 1830
+  - 755
+  lcs_percent: 0.5
+- area_name: 手柄-代行奖励标题
+  area_type: text
+  pc_rect:
+  - 820
+  - 365
+  - 1120
+  - 435
+  text: 代行委托完成
+  lcs_percent: 0.9
+- area_name: 手柄-代行奖励确认
+  area_type: text
+  pc_rect:
+  - 805
+  - 700
+  - 1130
+  - 800
+  lcs_percent: 0.5
