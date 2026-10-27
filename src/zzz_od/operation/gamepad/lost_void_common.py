@@ -458,18 +458,24 @@ class GamepadLostVoidChooseCommon(GamepadOperation):
         if not candidates:
             return self.round_retry('等待原藏品名称识别', wait=1)
         if self._confirmed:
-            if self._signature != signature:
+            if set(signature) - set(self._signature or ()):
                 self.ctx.lost_void.priority_updated = False
                 return self.round_success('本次选择已关闭，后续藏品交由下一次识别')
             return self.round_retry('等待本次藏品确认生效', wait=1)
-        self._signature = signature
-        ordered = self.ctx.lost_void.get_artifact_by_priority(
-            candidates,
-            1,
-            consider_priority_new=self.ctx.lost_void.challenge_config.artifact_priority_new,
-        )
-        target = ordered[0] if ordered else candidates[0]
-        self._target = target.artifact.display_name
+        if self._target is None:
+            self._signature = signature
+            ordered = self.ctx.lost_void.get_artifact_by_priority(
+                candidates,
+                1,
+                consider_priority_new=self.ctx.lost_void.challenge_config.artifact_priority_new,
+            )
+            target = ordered[0] if ordered else candidates[0]
+            self._target = target.artifact.display_name
+        else:
+            # 高亮动画可能使名称短暂漏识别，不能因此改选另一张卡并来回移焦。
+            target = next((item for item in candidates if item.artifact.display_name == self._target), None)
+            if target is None:
+                return self.round_retry('等待已选目标名称恢复', wait=0.7)
         focused = self._focused_candidates(candidates)
         if len(focused) != 1:
             return self.round_retry('等待唯一藏品高亮框', wait=1)
