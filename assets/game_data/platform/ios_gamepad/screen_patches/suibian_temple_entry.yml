@@ -1,0 +1,10 @@
+screen_id: suibian_temple_entry
+added_areas:
+- area_name: 手柄-页面文字
+  area_type: text
+  pc_rect:
+  - 0
+  - 0
+  - 1920
+  - 1080
+  lcs_percent: 0.5

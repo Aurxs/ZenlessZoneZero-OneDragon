@@ -39,6 +39,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     'lost_void',
     'auto_battle',
     'dodge_assistant',
+    'suibian_temple',
 })
 
 
@@ -48,6 +49,7 @@ def get_macos_app_limits(app_id: str) -> str:
         'intel_board': 'Mac 手柄流程开发检查点：专业挑战和库萨里库单场已验，冥宁芙·双子当前队伍失败；完整周期及预备编队待验，暂未开放运行',
         'auto_battle': 'Mac 原生手柄独立助手：沿原策略等待战斗，支持暂停、恢复、停止及释放；从大世界、手柄战斗或战况菜单启动',
         'dodge_assistant': 'Mac 原生手柄闪避助手：沿原策略等待战斗，支持暂停、恢复、停止及释放；不在菜单继续输出',
+        'suibian_temple': 'Mac 支持已完成自动托管的领取与续开；进行中的托管保留至完成。手动游历、饮茶仙、制造、售卖及购买尚未适配，启用时会明确停止',
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
         'mouse_sensitivity_checker': 'Mac 在迷失之地入口层用唯一交互图标双向校准右摇杆，保存到当前账户；不修改 Windows 鼠标参数',
         'lost_void': 'Mac 战线肃清悬赏任务：活性维持或0至12、原预备编队、金币商店、实际8000进度和领奖；0活性、编队1整链及领奖已验收，其他活性待实测；其他模式及血量购买尚未适配',

@@ -1,13 +1,17 @@
+import sys
+
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
-from one_dragon.base.operation.operation_notify import node_notify, NotifyTiming
+from one_dragon.base.operation.operation_notify import NotifyTiming, node_notify
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
 from zzz_od.application.suibian_temple import suibian_temple_const
 from zzz_od.application.suibian_temple.operations.suibian_temple_adventure_squad import (
     SuibianTempleAdventureSquad,
 )
-from zzz_od.application.suibian_temple.operations.suibian_temple_auto_manage import SuibianTempleAutoManage
+from zzz_od.application.suibian_temple.operations.suibian_temple_auto_manage import (
+    SuibianTempleAutoManage,
+)
 from zzz_od.application.suibian_temple.operations.suibian_temple_boo_box import (
     SuibianTempleBooBox,
 )
@@ -49,6 +53,18 @@ class SuibianTempleApp(ZApplication):
 
     @operation_node(name='识别初始画面', is_start_node=True)
     def check_initial_screen(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.suibian_temple import (
+                validate_macos_temple_config,
+            )
+
+            reason = validate_macos_temple_config(self.config)
+            if reason is not None:
+                return self.round_fail(reason)
+            if self.last_screenshot is not None:
+                text = ''.join(self.ctx.ocr.run_ocr(self.last_screenshot)).replace(' ', '')
+                if ('经营日志' in text and '自动托管' in text) or ('邻里街坊' in text and any(word in text for word in ('托管中', '经营方针', '派驻邦布'))):
+                    return self.round_success('随便观-入口')
         # 特殊兼容 在入口区域开始
         screen_name, _ = self.check_screen_with_can_go(self.last_screenshot, '随便观-入口')
 
@@ -60,12 +76,18 @@ class SuibianTempleApp(ZApplication):
     @node_from(from_name='识别初始画面', status='不在随便观')
     @operation_node(name='传送')
     def goto_category(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.suibian_temple import GamepadTempleTransport
+
+            return self.round_by_op_result(GamepadTempleTransport(self.ctx).execute())
         op = Transport(self.ctx, '澄辉坪', '随便观', wait_at_last=False)
         return self.round_by_op_result(op.execute())
 
     @node_from(from_name='传送')
     @operation_node(name='前往随便观', timeout_seconds=60, node_max_retry_times=999)
     def goto_suibian_temple(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success('随便观手柄入口已确认')
         target_cn_list: list[str] = [
             '前往随便观',
             '确认',
@@ -100,6 +122,10 @@ class SuibianTempleApp(ZApplication):
     @node_notify(when=NotifyTiming.CURRENT_DONE, detail=True)
     @operation_node(name='处理自动托管')
     def handle_auto_manage(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.suibian_temple import GamepadTempleAutoManage
+
+            return self.round_by_op_result(GamepadTempleAutoManage(self.ctx).execute())
         if self.config.auto_manage_enabled:
             op = SuibianTempleAutoManage(self.ctx)
             return self.round_by_op_result(op.execute())
@@ -180,6 +206,10 @@ class SuibianTempleApp(ZApplication):
     @node_from(from_name='处理德丰大押')
     @operation_node(name='完成后返回')
     def back_at_last(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.suibian_temple import GamepadTempleBackToWorld
+
+            return self.round_by_op_result(GamepadTempleBackToWorld(self.ctx).execute())
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())
 
