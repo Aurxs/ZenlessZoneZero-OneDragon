@@ -16,9 +16,12 @@ if TYPE_CHECKING:
 class GamepadOpenFunction(_GamepadRewardOperation):
     """按功能名与唯一黄色框移焦，调用方继续确认目的页面。"""
 
-    def __init__(self, ctx: ZContext, target: str) -> None:
+    def __init__(self, ctx: ZContext, target: str, scroll_to_missing: bool = False) -> None:
         super().__init__(ctx, op_name=f'手柄功能导览 {target}', timeout_seconds=35)
         self.target: str = target
+        self.scroll_to_missing: bool = scroll_to_missing
+        self._scan_count: int = 0
+        self._scan_signature: tuple[int, int, tuple[str, ...]] | None = None
         self._opened: bool = False
         self._entered: bool = False
 
@@ -27,6 +30,8 @@ class GamepadOpenFunction(_GamepadRewardOperation):
         self.evidence_paths.clear()
         self._opened = False
         self._entered = False
+        self._scan_count = 0
+        self._scan_signature = None
 
     @operation_node(name='选择功能入口', is_start_node=True, node_max_retry_times=18)
     def select_function(self) -> OperationRoundResult:
@@ -43,6 +48,13 @@ class GamepadOpenFunction(_GamepadRewardOperation):
             image, words = area
             frames = find_yellow_focus_frames(image, 100, 175, 100, 180)
             target = self._text_rect(words, self.target)
+            if len(frames) == 1 and target is None and self.scroll_to_missing and self._scan_count < 6:
+                signature = (frames[0].x1, frames[0].y1, tuple(sorted(words)))
+                if signature != self._scan_signature:
+                    self.ctx.controller.btn_tap('dpad_down')
+                    self._scan_signature = signature
+                    self._scan_count += 1
+                return self.round_retry('等待下方功能卡片显示', wait=0.8)
             if len(frames) != 1 or target is None:
                 return self._pending_evidence('function_focus', f'未识别{self.target}或唯一功能焦点')
             focus = frames[0]

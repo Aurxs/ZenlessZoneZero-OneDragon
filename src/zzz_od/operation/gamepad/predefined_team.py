@@ -173,10 +173,11 @@ class GamepadChoosePredefinedTeam(GamepadOperation):
 class GamepadFocusPredefinedTeam(GamepadOperation):
     """通过首尾循环确认行号，再按可见卡片反馈定位原配置序号。"""
 
-    def __init__(self, ctx: ZContext, target_team_idx: int) -> None:
+    def __init__(self, ctx: ZContext, target_team_idx: int, management: bool = False) -> None:
         """只移动焦点，不选择、编辑或出战，可用于无消耗准备。"""
         super().__init__(ctx, op_name='手柄定位预备编队', timeout_seconds=100)
         self.target_team_idx: int = target_team_idx
+        self.management: bool = management
         self._at_top: bool = False
         self._row: int = 0
         self._previous: tuple[int, tuple[str, ...]] | None = None
@@ -199,7 +200,11 @@ class GamepadFocusPredefinedTeam(GamepadOperation):
         if self.last_screenshot is None:
             return self.round_retry('等待截图', wait=0.5)
         words = self.ctx.ocr.run_ocr(self.last_screenshot)
-        if not any('预备出战' in text for text in words):
+        selection = any('预备出战' in text for text in words)
+        if self.management:
+            if selection or not all(any(name in text for text in words) for name in ('BANGBOO', '选择', '返回')):
+                return self.round_fail('当前不是预备编队管理页')
+        elif not selection:
             return self.round_fail('当前不是预备编队选择页')
         areas = [self.ctx.screen_loader.get_area('编队选择', f'编队槽位{i}') for i in range(6)]
         if any(area is None for area in areas):

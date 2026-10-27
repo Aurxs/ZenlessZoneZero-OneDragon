@@ -1,3 +1,6 @@
+import sys
+from typing import TYPE_CHECKING
+
 from cv2.typing import MatLike
 
 from one_dragon.base.controller.drag_timing import DragTiming
@@ -16,6 +19,9 @@ from zzz_od.game_data.agent import Agent
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
 from zzz_od.operation.goto.goto_menu import GotoMenu
 from zzz_od.operation.predefined_team_recognizer import recognize_predefined_team
+
+if TYPE_CHECKING:
+    from zzz_od.macos.predefined_team_preview import MacPredefinedTeamPreview
 
 
 class TeamWrapper:
@@ -45,20 +51,31 @@ class PredefinedTeamChecker(ZApplication):
         )
 
         self.scroll_times: int = 0  # 下滑次数
+        self._macos_preview: MacPredefinedTeamPreview | None = None
 
     @operation_node(name='前往菜单画面', is_start_node=True)
     def goto_menu(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.function_guide import GamepadOpenFunction
+
+            self.ctx.macos_predefined_team_preview = None
+            self._macos_preview = None
+            return self.round_by_op_result(GamepadOpenFunction(self.ctx, '预备编队', scroll_to_missing=True).execute())
         op = GotoMenu(self.ctx)
         return self.round_by_op_result(op.execute())
 
     @node_from(from_name='前往菜单画面')
     @operation_node(name='前往更多功能画面')
     def goto_menu_more(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success('已由手柄功能导览进入')
         return self.round_by_goto_screen(screen_name='菜单-更多功能')
 
     @node_from(from_name='前往更多功能画面')
     @operation_node(name='点击预备编队')
     def click_predefined_team(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            return self.round_success('等待只读扫描核对管理页')
         return self.round_by_find_and_click_area(screen_name='菜单-更多功能', area_name='按钮-预备编队',
                                                  until_not_find_all=[('菜单-更多功能', '按钮-兑换码')],
                                                  success_wait=2, retry_wait=1)
@@ -66,6 +83,16 @@ class PredefinedTeamChecker(ZApplication):
     @node_from(from_name='点击预备编队')
     @operation_node(name='识别编队角色')
     def check_team_members(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.predefined_team_scan import (
+                GamepadScanPredefinedTeams,
+            )
+
+            op = GamepadScanPredefinedTeams(self.ctx)
+            result = op.execute()
+            if result.success:
+                self._macos_preview = op.preview
+            return self.round_by_op_result(result)
         self.update_team_members(self.last_screenshot)
 
         if self.scroll_times < 4:
@@ -137,6 +164,15 @@ class PredefinedTeamChecker(ZApplication):
     @node_from(from_name='识别编队角色')
     @operation_node(name='成功后返回')
     def back_at_last(self) -> OperationRoundResult:
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.predefined_team_scan import (
+                GamepadClosePredefinedTeams,
+            )
+
+            result = GamepadClosePredefinedTeams(self.ctx).execute()
+            if result.success:
+                self.ctx.macos_predefined_team_preview = self._macos_preview
+            return self.round_by_op_result(result)
         op = BackToNormalWorld(self.ctx)
         return self.round_by_op_result(op.execute())
 

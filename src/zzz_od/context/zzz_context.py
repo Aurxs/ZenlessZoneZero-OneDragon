@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from zzz_od.config.macos_config import MacOsConfig
     from zzz_od.macos.game_session_preparation import MacGameSessionPreparation
     from zzz_od.macos.manual_gamepad import ManualGamepadSession
+    from zzz_od.macos.predefined_team_preview import MacPredefinedTeamPreview
 
 
 class ZContext(OneDragonContext):
@@ -17,6 +18,7 @@ class ZContext(OneDragonContext):
     def __init__(self,):
 
         OneDragonContext.__init__(self)
+        self.macos_predefined_team_preview: MacPredefinedTeamPreview | None = None
 
         if sys.platform == 'darwin':
             from one_dragon.base.screen.profile_screen_context import (
@@ -135,6 +137,7 @@ class ZContext(OneDragonContext):
 
     def reload_instance_config(self) -> None:
         """刷新实例配置；Mac 控制器先释放输入，再重新构造绑定服务。"""
+        self.macos_predefined_team_preview = None
         if 'manual_gamepad' in self.__dict__:
             self.manual_gamepad.stop()
         rebuild_macos_controller = sys.platform == 'darwin' and self.controller is not None

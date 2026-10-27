@@ -1,3 +1,5 @@
+import sys
+
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QValidator
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
@@ -6,6 +8,9 @@ from qfluentwidgets import (
     FluentIcon,
     LineEdit,
     MessageBox,
+    MessageBoxBase,
+    SubtitleLabel,
+    TextEdit,
 )
 
 from one_dragon.base.config.config_item import ConfigItem
@@ -26,6 +31,30 @@ from zzz_od.application.game_config_checker.predefined_team_checker import (
 from zzz_od.config.team_config import PredefinedTeamInfo
 from zzz_od.context.zzz_context import ZContext
 from zzz_od.game_data.agent import AgentEnum
+from zzz_od.macos.predefined_team_preview import MacPredefinedTeamPreview
+
+
+class TeamRecognitionPreviewDialog(MessageBoxBase):
+    """完整列出二十队提议，取消时不写任何配置。"""
+
+    def __init__(self, preview: MacPredefinedTeamPreview, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.viewLayout.addWidget(SubtitleLabel('预备编队识别预览'))
+        names = {item.value.agent_id: item.value.agent_name for item in AgentEnum}
+        lines = ['确认后仅更新已识别队名和完整三人成员；战斗策略和未识别成员保留。', '']
+        for item in preview.teams:
+            old_name, strategy, old_ids = preview.baseline[item.team_idx]
+            new_name = item.name or f'{old_name}（未识别，保留）'
+            old_members = '、'.join(names.get(value, value) for value in old_ids)
+            new_members = '、'.join(names.get(value, value) for value in item.agent_ids) if len(item.agent_ids) == 3 else f'{old_members}（识别不完整，保留）'
+            lines.extend([f'{item.team_idx + 1}. {old_name} → {new_name}', f'   {old_members} → {new_members}', f'   战斗配置：{strategy}（保留）', ''])
+        viewer = TextEdit()
+        viewer.setReadOnly(True)
+        viewer.setPlainText('\n'.join(lines))
+        viewer.setMinimumSize(680, 400)
+        self.viewLayout.addWidget(viewer)
+        self.yesButton.setText('确认写入')
+        self.cancelButton.setText('取消')
 
 
 class TeamNameValidator(QValidator):
@@ -170,6 +199,7 @@ class TeamSettingCard(SettingCardBase):
 class PredefinedTeamInterface(SplitAppRunInterface):
 
     def __init__(self, ctx: ZContext, parent=None):
+        self.preview_card: PushSettingCard | None = None
         SplitAppRunInterface.__init__(
             self,
             ctx=ctx,
@@ -189,7 +219,40 @@ class PredefinedTeamInterface(SplitAppRunInterface):
         )
         help_card.clicked.connect(self._on_help_clicked)
         top.add_widget(help_card)
+        if sys.platform == 'darwin':
+            self.preview_card = PushSettingCard(
+                icon=FluentIcon.PEOPLE, title='识别结果', text='预览并确认写入',
+                content='开始后只读扫描二十队，确认前不更新配置',
+            )
+            self.preview_card.clicked.connect(self._on_preview_clicked)
+            self.preview_card.setEnabled(False)
+            top.add_widget(self.preview_card)
         return top
+
+    def _on_preview_clicked(self) -> None:
+        preview = self.ctx.macos_predefined_team_preview
+        if preview is None or not self.ctx.run_context.is_context_stop:
+            return
+        if not TeamRecognitionPreviewDialog(preview, self.window()).exec():
+            return
+        try:
+            count = preview.apply(self.ctx)
+        except ValueError as error:
+            dialog = MessageBox('编队未更新', str(error), self.window())
+            dialog.cancelButton.hide()
+            dialog.exec()
+            return
+        self.ctx.macos_predefined_team_preview = None
+        self._refresh_team_cards()
+        self._refresh_preview_card()
+        self.preview_card.setContent(f'已确认更新 {count} 队，战斗策略保留')
+
+    def _refresh_preview_card(self) -> None:
+        if self.preview_card is None:
+            return
+        preview = self.ctx.macos_predefined_team_preview
+        self.preview_card.setEnabled(preview is not None and self.ctx.run_context.is_context_stop)
+        self.preview_card.setContent('已识别二十队，等待预览确认；尚未写入' if preview is not None else '开始后只读扫描二十队，确认前不更新配置')
 
     def get_left_widget(self) -> QWidget:
         left_widget = Column(margins=Margins(0, 0, 16, 0))
@@ -206,13 +269,17 @@ class PredefinedTeamInterface(SplitAppRunInterface):
     def _on_help_clicked(self) -> None:
         content = (
             '▎编队名称\n\n'
-            '请确保编队名称与游戏内完全一致，顺序随意，\n'
-            '名称不匹配会导致无法识别。\n\n'
-            '不建议使用默认的数字命名编队，\n'
-            'OCR 识别数字容易出错，建议使用中文名称。\n\n'
-            '▎自动识别\n\n'
+            + ('Mac 按游戏内槽位顺序对应二十队，现有名称可以作为别名。\n'
+               '预览会列出队名和成员的变更，未读全的字段保留。\n\n' if sys.platform == 'darwin'
+               else '请确保编队名称与游戏内完全一致，顺序随意，\n'
+               '名称不匹配会导致无法识别。\n\n'
+               '不建议使用默认的数字命名编队，\n'
+               'OCR 识别数字容易出错，建议使用中文名称。\n\n')
+            + '▎自动识别\n\n'
             '点击「开始」后将自动打开游戏内预备编队页面，\n'
-            '通过截图识别各编队中的代理人并填入左侧配置。'
+            + ('通过截图只读识别二十队，返回后点击「预览并确认写入」。\n'
+               '取消不会保存，战斗策略与未识别成员保留。' if sys.platform == 'darwin'
+               else '通过截图识别各编队中的代理人并填入左侧配置。')
         )
         w = MessageBox(gt('使用说明'), content, self.window())
         w.cancelButton.hide()
@@ -221,6 +288,7 @@ class PredefinedTeamInterface(SplitAppRunInterface):
 
     def on_interface_shown(self) -> None:
         SplitAppRunInterface.on_interface_shown(self)
+        self._refresh_preview_card()
 
         auto_battle_list = get_auto_battle_op_config_list('auto_battle')
         team_list = self.ctx.team_config.team_list
@@ -237,6 +305,7 @@ class PredefinedTeamInterface(SplitAppRunInterface):
         super().on_context_state_changed()
         if self.ctx.run_context.is_context_stop:
             self._refresh_team_cards()
+        self._refresh_preview_card()
 
     def _refresh_team_cards(self) -> None:
         """根据当前配置刷新编队卡片的代理人选项。"""
