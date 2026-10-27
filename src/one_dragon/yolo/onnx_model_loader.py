@@ -1,11 +1,14 @@
+import hashlib
 import os
+import sys
 import time
 import urllib.request
 import zipfile
+from pathlib import Path
 
 import onnxruntime as ort
 
-from one_dragon.utils import gpu_executor
+from one_dragon.utils import gpu_executor, os_utils
 from one_dragon.yolo.log_utils import log
 
 _GH_PROXY_URL = 'https://ghfast.top'
@@ -31,7 +34,7 @@ class OnnxModelLoader:
         self.gh_proxy: bool = gh_proxy
         self.gh_proxy_url: str = gh_proxy_url
         self.personal_proxy: str | None = personal_proxy
-        self.gpu: bool = gpu  # 是否使用GPU加速
+        self.gpu: bool = gpu  # 是否启用平台模型加速，Mac 使用 Core ML
 
         # 从模型中读取到的输入输出信息
         self.session: ort.InferenceSession = None
@@ -127,19 +130,25 @@ class OnnxModelLoader:
         :return:
         """
         availables = ort.get_available_providers()
+        onnx_path = os.path.join(self.model_dir_path, 'model.onnx')
+        providers: list[str | tuple[str, dict[str, str]]]
 
         if self.gpu:
-            if 'CUDAExecutionProvider' in availables:
+            if sys.platform == 'darwin' and 'CoreMLExecutionProvider' in availables:
+                providers = [
+                    ('CoreMLExecutionProvider', self._get_coreml_options(Path(onnx_path))),
+                    'CPUExecutionProvider',
+                ]
+            elif 'CUDAExecutionProvider' in availables:
                 providers = ['CUDAExecutionProvider']
             elif 'DmlExecutionProvider' in availables:
                 providers = ['DmlExecutionProvider']
             else:
                 providers = ['CPUExecutionProvider']
-                log.warning('未找到GPU执行提供程序，回退到CPU')
+                log.warning('未找到模型加速执行提供程序，回退到CPU')
         else:
             providers = ['CPUExecutionProvider']
 
-        onnx_path = os.path.join(self.model_dir_path, 'model.onnx')
         log.info('加载模型 %s', onnx_path)
 
         session_options = ort.SessionOptions()
@@ -151,17 +160,39 @@ class OnnxModelLoader:
         session_options.add_session_config_entry('session.inter_op.allow_spinning', '0')
 
         log.info('开始创建ONNX Runtime会话 %s providers=%s', onnx_path, providers)
-        self.session = gpu_executor.create_onnx_session(
-            lambda: ort.InferenceSession(
-                onnx_path,
-                sess_options=session_options,
-                providers=providers,
-            ),
-            providers=providers,
-        )
+        provider_names = [p[0] if isinstance(p, tuple) else p for p in providers]
+        try:
+            self.session = gpu_executor.create_onnx_session(
+                lambda: ort.InferenceSession(
+                    onnx_path,
+                    sess_options=session_options,
+                    providers=providers,
+                ),
+                providers=provider_names,
+            )
+        except Exception:
+            if 'CoreMLExecutionProvider' not in provider_names:
+                raise
+            log.warning('Core ML 模型初始化失败，回退到CPU', exc_info=True)
+            self.session = ort.InferenceSession(
+                onnx_path, sess_options=session_options, providers=['CPUExecutionProvider'],
+            )
         log.info('创建ONNX Runtime会话完成 providers=%s', self.session.get_providers())
         self.get_input_details()
         self.get_output_details()
+
+    def _get_coreml_options(self, onnx_path: Path) -> dict[str, str]:
+        """按模型内容隔离编译缓存，避免同路径更新后复用旧模型。"""
+        with onnx_path.open('rb') as model_file:
+            model_hash = hashlib.file_digest(model_file, 'sha256').hexdigest()
+        cache_dir = Path(os_utils.get_path_under_work_dir('.runtime', 'coreml')) / model_hash
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return {
+            'ModelFormat': 'MLProgram',
+            'MLComputeUnits': 'ALL',
+            'RequireStaticInputShapes': '1',
+            'ModelCacheDirectory': str(cache_dir),
+        }
 
     def run_session(self, output_names: list[str], input_feed: dict):
         return gpu_executor.run_session(self.session, output_names, input_feed=input_feed)

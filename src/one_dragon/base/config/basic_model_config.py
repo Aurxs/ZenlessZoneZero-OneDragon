@@ -32,6 +32,10 @@ class BasicModelConfig(YamlConfig):
         self.repo_config: RepoConfig = repo_config
         YamlConfig.__init__(self, 'model', instance_idx=None)
 
+    def get_model_acceleration_config(self, gpu_config_key: str | None) -> tuple[str | None, str]:
+        """返回模型加速开关的配置键和显示名称；无配置键时隐藏开关。"""
+        return gpu_config_key, 'GPU'
+
     @property
     def ocr(self) -> str:
         value = self.get('ocr', DEFAULT_OCR_MODEL_NAME)

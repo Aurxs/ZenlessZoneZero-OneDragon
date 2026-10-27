@@ -1,3 +1,5 @@
+import sys
+
 from one_dragon.base.config.basic_model_config import BasicModelConfig
 
 _DEFAULT_FLASH_CLASSIFIER = 'yolov8n-640-flash-20250921'
@@ -10,6 +12,13 @@ _DEFAULT_LOST_VOID_DET = 'yolov26n-736-lost-void-det-20260630'
 _BACKUP_LOST_VOID_DET = 'yolov8n-736-lost-void-det-20250921'
 
 class ModelConfig(BasicModelConfig):
+
+    def get_model_acceleration_config(self, gpu_config_key: str | None) -> tuple[str | None, str]:
+        """Mac 复用原开关保存 Core ML 选择，仅开放已验证的两个模型。"""
+        if sys.platform == 'darwin':
+            supported = {'flash_classifier_gpu', 'lost_void_det_gpu'}
+            return gpu_config_key if gpu_config_key in supported else None, 'Core ML'
+        return super().get_model_acceleration_config(gpu_config_key)
 
     @property
     def flash_classifier(self) -> str:

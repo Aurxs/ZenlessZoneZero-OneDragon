@@ -1,10 +1,12 @@
+
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QIcon, Qt
-from qfluentwidgets import FluentIconBase, SwitchButton, IndicatorPosition
-from typing import Union
+from PySide6.QtGui import QIcon
+from qfluentwidgets import FluentIconBase, IndicatorPosition, SwitchButton
 
 from one_dragon.base.operation.one_dragon_context import OneDragonContext
-from one_dragon_qt.widgets.setting_card.common_download_card import ZipDownloaderSettingCard
+from one_dragon_qt.widgets.setting_card.common_download_card import (
+    ZipDownloaderSettingCard,
+)
 
 
 class OnnxModelDownloadCard(ZipDownloaderSettingCard):
@@ -14,7 +16,7 @@ class OnnxModelDownloadCard(ZipDownloaderSettingCard):
     def __init__(
             self,
             ctx: OneDragonContext,
-            icon: Union[str, QIcon, FluentIconBase],
+            icon: str | QIcon | FluentIconBase,
             title: str,
             content=None,
             parent=None
@@ -37,3 +39,7 @@ class OnnxModelDownloadCard(ZipDownloaderSettingCard):
 
     def on_gpu_value_changed(self, value: bool) -> None:
         self.gpu_changed.emit(value)
+
+    def set_acceleration_label(self, name: str) -> None:
+        """替换同一个加速开关的文案，不触发配置变更。"""
+        self.gpu_opt.setOnText(name)

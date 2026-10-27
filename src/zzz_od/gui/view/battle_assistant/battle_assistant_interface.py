@@ -136,8 +136,12 @@ class BattleAssistantInterface(AppRunInterface):
         top.add_widget(self.mode_stacked)
 
         # 共用设置（两种模式共享）
+        _, acceleration_name = self.ctx.model_config.get_model_acceleration_config('flash_classifier_gpu')
         self.gpu_opt = SwitchSettingCard(
-            icon=FluentIcon.GAME, title='GPU运算', content='游戏画面掉帧的话 可以不启用',
+            icon=FluentIcon.GAME,
+            title='使用 Core ML' if acceleration_name == 'Core ML' else 'GPU运算',
+            content=('加速闪光识别，下次启动任务时生效；关闭后使用 CPU'
+                     if acceleration_name == 'Core ML' else '游戏画面掉帧的话 可以不启用'),
         )
         top.add_widget(self.gpu_opt)
 

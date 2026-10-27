@@ -332,7 +332,12 @@ class ResourceManagementInterface(VerticalScrollInterface):
             config_key='ocr',
             resource_id='ocr',
         )
-        self.ocr_opt.gpu_changed.connect(self._on_ocr_gpu_changed)
+        ocr_key, _ = self.ctx.model_config.get_model_acceleration_config('ocr_use_gpu')
+        if ocr_key is None:
+            self.ocr_opt.gpu_opt.hide()
+            self.ocr_opt.setContent('当前平台的 OCR 使用 CPU')
+        else:
+            self.ocr_opt.gpu_changed.connect(self._on_ocr_gpu_changed)
         self.download_items_group.addSettingCard(self.ocr_opt)
 
         self._add_model_resource_cards(self.download_items_group)
@@ -366,12 +371,18 @@ class ResourceManagementInterface(VerticalScrollInterface):
         card: OnnxModelDownloadCard,
         resource: ModelResourceDefinition,
     ) -> None:
-        """按声明绑定模型 GPU 配置；未声明时隐藏开关。"""
-        if resource.gpu_config_key is None:
+        """按平台替换原加速开关；没有支持的后端时隐藏。"""
+        config_key, label = self.ctx.model_config.get_model_acceleration_config(resource.gpu_config_key)
+        if config_key is None:
             card.gpu_opt.hide()
+            if label == 'Core ML':
+                card.setContent('当前平台此模型暂使用 CPU')
             return
+        card.set_acceleration_label(label)
+        if label == 'Core ML':
+            card.setContent('开启后使用 Core ML，下次启动任务时生效；关闭后使用 CPU')
         card.gpu_changed.connect(
-            lambda value, key=resource.gpu_config_key: (
+            lambda value, key=config_key: (
                 self.ctx.model_config.update(key, value)
             )
         )
@@ -631,16 +642,19 @@ class ResourceManagementInterface(VerticalScrollInterface):
                 'resource_download_no_confirm'
             )
         )
-        self.ocr_opt.gpu_opt.setChecked(self.ctx.model_config.ocr_use_gpu)
+        ocr_key, _ = self.ctx.model_config.get_model_acceleration_config('ocr_use_gpu')
+        if ocr_key is not None:
+            self.ocr_opt.gpu_opt.setChecked(self.ctx.model_config.ocr_use_gpu)
         for resource in self.ctx.model_config.get_model_resources():
-            if resource.gpu_config_key is None:
+            config_key, _ = self.ctx.model_config.get_model_acceleration_config(resource.gpu_config_key)
+            if config_key is None:
                 continue
             card = self.model_resource_cards.get(resource.config_key)
             if card is not None:
                 card.gpu_opt.setChecked(
                     bool(
                         self.ctx.model_config.get(
-                            resource.gpu_config_key,
+                            config_key,
                             False,
                         )
                     )

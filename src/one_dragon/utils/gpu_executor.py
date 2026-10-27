@@ -16,7 +16,7 @@ def _mark_executor_thread() -> None:
     _executor_local.is_gpu_executor_thread = True
 
 
-# 限制只能有一个方法访问 DirectML GPU 避免多 session 并发崩溃
+# DirectML 和 Core ML 的创建及推理共用一个工作线程，避免多 session 并发。
 _executor = ThreadPoolExecutor(
     thread_name_prefix=_THREAD_PREFIX,
     max_workers=1,
@@ -41,7 +41,9 @@ def run_sync(fn: Callable[..., T], /, *args, **kwargs) -> T:
 
 
 def should_serialize_providers(providers: Sequence[str] | None) -> bool:
-    return providers is not None and _DML_PROVIDER in providers
+    return providers is not None and (
+        _DML_PROVIDER in providers or 'CoreMLExecutionProvider' in providers
+    )
 
 
 def create_onnx_session(
