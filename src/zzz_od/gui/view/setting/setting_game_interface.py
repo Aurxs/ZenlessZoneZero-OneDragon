@@ -90,7 +90,8 @@ class SettingGameInterface(VerticalScrollInterface):
                                                  options_enum=TypeInputWay)
         basic_group.addSettingCard(self.input_way_opt)
 
-        basic_group.addSettingCard(self._get_background_mode_group())
+        background_group = self._get_background_mode_group()
+        basic_group.addSettingCard(background_group)
 
         self.hdr_btn_enable = PushButton(text=gt('启用 HDR'), icon=FluentIcon.SETTING, parent=self)
         self.hdr_btn_enable.clicked.connect(self._on_hdr_enable_clicked)
@@ -101,7 +102,19 @@ class SettingGameInterface(VerticalScrollInterface):
                                             btn_list=[self.hdr_btn_disable, self.hdr_btn_enable])
         basic_group.addSettingCard(self.hdr_btn)
 
-        basic_group.addSettingCard(self._get_launch_argument_group())
+        launch_argument_group = self._get_launch_argument_group()
+        basic_group.addSettingCard(launch_argument_group)
+
+        if sys.platform == 'darwin':
+            # Mac 仍使用界面组合键，隐藏同组中无效的 Windows 后台开关。
+            self.input_way_opt.hide()
+            self.hdr_btn.hide()
+            launch_argument_group.hide()
+            background_group.card.setTitle(gt('界面快捷键'))
+            background_group.card.setContent(gt('菜单、地图和快捷手册的手柄组合键，使用 Xbox 映射'))
+            self.background_mode_switch.btn.hide()
+            self.background_gamepad_type_opt.combo_box.hide()
+            self.mouse_flash_duration_opt.hide()
 
         return basic_group
 
@@ -200,6 +213,9 @@ class SettingGameInterface(VerticalScrollInterface):
         key_settings_group.addSettingCard(self._keyboard_group)
         key_settings_group.addSettingCard(self._gamepad_group)
 
+        if sys.platform == 'darwin':
+            self._keyboard_group.hide()
+
         return key_settings_group
 
     def _get_keyboard_group(self) -> ExpandSettingCardGroup:
@@ -220,6 +236,9 @@ class SettingGameInterface(VerticalScrollInterface):
         gamepad_display_combo.set_items([GamepadTypeEnum.XBOX.value, GamepadTypeEnum.DS4.value])
         gamepad_display_combo.currentIndexChanged.connect(self._toggle_gamepad_cards)
         gamepad_group.addHeaderWidget(gamepad_display_combo)
+        if sys.platform == 'darwin':
+            gamepad_display_combo.hide()
+            gamepad_group.card.setContent(gt('Mac 使用 Xbox 按键映射，请与游戏内的手柄按键保持一致'))
 
         # xbox
         self.xbox_key_press_time_opt = DoubleSpinBoxSettingCard(icon=FluentIcon.GAME, title='单次按键持续时间(秒)',
@@ -285,7 +304,7 @@ class SettingGameInterface(VerticalScrollInterface):
 
     def _toggle_gamepad_cards(self, index: int) -> None:
         """根据头部下拉框切换 Xbox/DS4 卡片可见性"""
-        is_xbox = index == 0
+        is_xbox = sys.platform == 'darwin' or index == 0
 
         self.xbox_key_press_time_opt.setVisible(is_xbox)
         for card in self._xbox_cards.values():
@@ -297,7 +316,10 @@ class SettingGameInterface(VerticalScrollInterface):
 
     def _toggle_action_cards(self) -> None:
         """根据配置切换 Xbox/DS4 动作键卡片可见性。"""
-        is_xbox = self.ctx.game_config.background_gamepad_type == GamepadTypeEnum.XBOX.value.value
+        is_xbox = (
+            sys.platform == 'darwin'
+            or self.ctx.game_config.background_gamepad_type == GamepadTypeEnum.XBOX.value.value
+        )
         for card in self._xbox_action_cards.values():
             card.setVisible(is_xbox)
         for card in self._ds4_action_cards.values():
