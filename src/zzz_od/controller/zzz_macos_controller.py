@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from cv2.typing import MatLike
 
     from one_dragon.base.controller.drag_timing import DragTiming
-    from one_dragon.base.controller.gamepad_input import GamepadInput
+    from one_dragon.base.controller.gamepad_input import GamepadInput, GamepadSide
     from one_dragon.base.controller.macos.macos_game_launcher import MacGameLauncher
     from one_dragon.base.controller.macos.macos_window_capture import MacWindowCapture
     from one_dragon.base.controller.macos.sck_frame_converter import CapturedFrame
@@ -360,6 +360,16 @@ class ZMacController(ControllerBase):
             self.gamepad.release(key)
         else:
             self.gamepad.reset()
+
+    def set_gamepad_stick(self, side: GamepadSide, x: float, y: float) -> None:
+        """提供手动摇杆入口，仍复用有效新帧和输入暂停保护。"""
+        if x == 0 and y == 0:
+            # 松开不应被旧帧挡住；暂停后的底层状态已归零。
+            if self.gamepad.is_connected and not self._input_paused:
+                self.gamepad.set_stick(side, 0, 0)
+            return
+        if self._require_input_ready():
+            self.gamepad.set_stick(side, x, y)
 
     def _action_btn(self, action: str, press: bool, press_time: float | None, release: bool) -> None:
         """把既有业务动作交给 Xbox 配置对应的手柄键。"""

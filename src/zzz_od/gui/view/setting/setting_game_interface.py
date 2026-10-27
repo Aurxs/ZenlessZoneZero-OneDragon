@@ -73,9 +73,9 @@ class SettingGameInterface(VerticalScrollInterface):
             runtime_group = SettingCardGroup('Mac 运行设置（当前账户）')
             self.macos_runtime_settings = MacRuntimeSettings(self.ctx, runtime_group, self)
             content_widget.add_widget(runtime_group)
-            gamepad_group = SettingCardGroup('Mac 手柄服务')
-            self.macos_gamepad_settings = MacGamepadSettings(self.ctx, gamepad_group, self)
-            content_widget.add_widget(gamepad_group)
+            self.help_opt.setContent('游戏路径和采集设置；按键映射、手柄服务与手动控制请打开“设置 → 手柄”。')
+            content_widget.add_stretch(1)
+            return content_widget
 
         content_widget.add_widget(self._get_basic_group())
         content_widget.add_widget(self._get_key_settings_group())
@@ -270,6 +270,7 @@ class SettingGameInterface(VerticalScrollInterface):
         VerticalScrollInterface.on_interface_shown(self)
         if self.macos_runtime_settings is not None:
             self.macos_runtime_settings.reload()
+            return
         if self.macos_gamepad_settings is not None:
             self.macos_gamepad_settings.reload()
 

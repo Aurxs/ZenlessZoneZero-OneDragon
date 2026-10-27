@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
+from threading import Lock
 from typing import TYPE_CHECKING, TypeVar
 
 from one_dragon.base.operation.context_event_bus import ContextEventBus
@@ -14,6 +15,8 @@ from one_dragon.utils.i18_utils import gt
 from one_dragon.utils.log_utils import log
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from one_dragon.base.operation.application.application_config import (
         ApplicationConfig,
     )
@@ -110,6 +113,7 @@ class ApplicationRunContext:
         self.last_run_result: ApplicationRunResult | None = None
         # 同步运行应用的最近一次结果，供 backend 运行槽固化终态使用。
         self.last_application_result: OperationResult | None = None
+        self._start_lock: Lock = Lock()
 
         # 通知池，应用开始时清空重用
         self.notify_pool: NotifyPool = NotifyPool()
@@ -388,6 +392,16 @@ class ApplicationRunContext:
         return result
 
     def start_running(self) -> bool:
+        """拒绝并发初始化，避免手动手柄与自动任务争用同一控制器。"""
+        if not self._start_lock.acquire(blocking=False):
+            log.error('另一个入口正在初始化控制器')
+            return False
+        try:
+            return self._start_running()
+        finally:
+            self._start_lock.release()
+
+    def _start_running(self) -> bool:
         """
         开始运行。
 
@@ -569,12 +583,14 @@ class ApplicationRunContext:
         instance_idx: int,
         group_id: str,
         init_timeout: int = 60,
+        on_done: Callable[[Future[ApplicationRunResult]], None] | None = None,
     ) -> bool:
         """
         异步运行指定的应用。
 
         使用线程池在后台运行应用，不阻塞主线程。
         只有在上下文处于停止状态时才能启动异步运行。
+        on_done 在工作线程收到最终 Future，供无窗口或专用页面处理未开始/异常结果。
 
         Args:
             app_id: 应用ID
@@ -593,6 +609,8 @@ class ApplicationRunContext:
 
         future = self._executor.submit(self.run_application, app_id, instance_idx, group_id, init_timeout)
         future.add_done_callback(thread_utils.handle_future_result)
+        if on_done is not None:
+            future.add_done_callback(on_done)
 
         return True
 

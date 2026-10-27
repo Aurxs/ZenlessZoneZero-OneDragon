@@ -9,6 +9,7 @@ from one_dragon.base.operation.one_dragon_context import OneDragonContext
 if TYPE_CHECKING:
     from zzz_od.config.macos_config import MacOsConfig
     from zzz_od.macos.game_session_preparation import MacGameSessionPreparation
+    from zzz_od.macos.manual_gamepad import ManualGamepadSession
 
 
 class ZContext(OneDragonContext):
@@ -114,6 +115,13 @@ class ZContext(OneDragonContext):
         return MacGameSessionPreparation(self)
 
     @cached_property
+    def manual_gamepad(self) -> ManualGamepadSession:
+        """手动控制与自动应用共用一个运行上下文和控制器。"""
+        from zzz_od.macos.manual_gamepad import ManualGamepadSession
+
+        return ManualGamepadSession(self)
+
+    @cached_property
     def team_config(self):
         from zzz_od.config.team_config import TeamConfig
         return TeamConfig(self.current_instance_idx)
@@ -127,6 +135,8 @@ class ZContext(OneDragonContext):
 
     def reload_instance_config(self) -> None:
         """刷新实例配置；Mac 控制器先释放输入，再重新构造绑定服务。"""
+        if 'manual_gamepad' in self.__dict__:
+            self.manual_gamepad.stop()
         rebuild_macos_controller = sys.platform == 'darwin' and self.controller is not None
         if rebuild_macos_controller:
             if not self.run_context.is_context_stop:
@@ -247,6 +257,8 @@ class ZContext(OneDragonContext):
         """
         App关闭后进行的操作 关闭一切可能资源操作
         """
+        if 'manual_gamepad' in self.__dict__:
+            self.manual_gamepad.stop()
         if hasattr(self, 'telemetry') and self.telemetry:
             self.telemetry.shutdown()
 

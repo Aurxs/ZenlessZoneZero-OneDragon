@@ -29,6 +29,12 @@ class AppSettingInterface(PivotNavigatorInterface):
         :return:
         """
         self.add_sub_interface(SettingGameInterface(ctx=self.ctx))
+        if sys.platform == 'darwin':
+            from zzz_od.gui.view.setting.setting_gamepad_interface import (
+                SettingGamepadInterface,
+            )
+
+            self.add_sub_interface(SettingGamepadInterface(ctx=self.ctx))
         if sys.platform == 'win32':
             from zzz_od.gui.view.setting.setting_overlay_interface import (
                 SettingOverlayInterface,
