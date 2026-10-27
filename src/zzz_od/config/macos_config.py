@@ -91,6 +91,18 @@ class MacOsConfig(YamlConfig):
         self.update('capture_fps', value)
 
     @property
+    def capture_auto_top_inset(self) -> bool:
+        """默认按 16:9 和当前窗口底边自动裁剪，旧账户无需改写配置。"""
+        return self.get('capture_auto_top_inset', True)
+
+    @capture_auto_top_inset.setter
+    def capture_auto_top_inset(self, value: bool) -> None:
+        """保存自动适配开关，关闭后使用原手动裁剪参数。"""
+        if type(value) is not bool:
+            raise ValueError('自动顶部裁剪选项必须是布尔值')
+        self.update('capture_auto_top_inset', value)
+
+    @property
     def capture_top_inset_pixels(self) -> int:
         """返回已确认的顶部标题栏像素数；零表示采集完整窗口。"""
         return self.get('capture_top_inset_pixels', 0)

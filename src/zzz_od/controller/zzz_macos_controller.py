@@ -190,7 +190,9 @@ class ZMacController(ControllerBase):
             window = self.game_launcher.ensure_window()
             self._started_game_this_run = self.game_launcher.started_game
             points = getattr(self.macos_config,'capture_top_inset_points',0)
-            if points:
+            if self.macos_config.capture_auto_top_inset:
+                self.window_capture.start(window, fps=self.macos_config.capture_fps, auto_top_inset=True)
+            elif points:
                 self.window_capture.start(window,fps=self.macos_config.capture_fps,top_inset_points=points)
             else:
                 self.window_capture.start(

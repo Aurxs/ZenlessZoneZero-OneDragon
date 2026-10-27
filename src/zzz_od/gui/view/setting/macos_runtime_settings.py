@@ -13,6 +13,7 @@ from one_dragon_qt.widgets.setting_card.combo_box_setting_card import (
     ComboBoxSettingCard,
 )
 from one_dragon_qt.widgets.setting_card.spin_box_setting_card import SpinBoxSettingCard
+from one_dragon_qt.widgets.setting_card.switch_setting_card import SwitchSettingCard
 from one_dragon_qt.widgets.setting_card.text_setting_card import TextSettingCard
 
 if TYPE_CHECKING:
@@ -53,15 +54,21 @@ class MacRuntimeSettings(QObject):
         )
         self.macos_launch_timeout_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_launch_timeout_opt)
+        self.macos_auto_top_inset_opt: SwitchSettingCard = SwitchSettingCard(
+            icon=FluentIcon.PHOTO, title='自动适配游戏窗口',
+            content='默认开启；按16:9和窗口底边自动忽略标题栏，放大缩小后自动适配',
+        )
+        self.macos_auto_top_inset_opt.value_changed.connect(self._on_auto_top_inset_changed)
+        group.addSettingCard(self.macos_auto_top_inset_opt)
         self.macos_top_inset_opt: SpinBoxSettingCard = SpinBoxSettingCard(
             icon=FluentIcon.PHOTO, title='截图顶部裁剪（旧像素配置）', minimum=0, maximum=256,
-            content='逻辑点高度为0时使用本值；保留已有像素设置，剩余内容须为16:9',
+            content='关闭自动适配且逻辑点高度为0时使用；保留已有像素设置',
         )
         self.macos_top_inset_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_top_inset_opt)
         self.macos_top_inset_points_opt: SpinBoxSettingCard = SpinBoxSettingCard(
             icon=FluentIcon.PHOTO,title='标题栏高度（逻辑点）',minimum=0,maximum=256,
-            content='填写已确认的窗口标题栏逻辑点高度；非0时按每帧缩放换算，优先于旧像素配置',
+            content='关闭自动适配后使用；非0时按每帧缩放换算，优先于旧像素配置',
         )
         self.macos_top_inset_points_opt.value_changed.connect(self._on_mac_config_changed)
         group.addSettingCard(self.macos_top_inset_points_opt)
@@ -88,6 +95,20 @@ class MacRuntimeSettings(QObject):
         self.macos_top_inset_points_opt.init_with_adapter(
             self.ctx.macos_config.get_prop_adapter('capture_top_inset_points'),
         )
+        self.macos_auto_top_inset_opt.init_with_adapter(
+            self.ctx.macos_config.get_prop_adapter('capture_auto_top_inset'),
+        )
+        self._update_manual_inset_enabled(self.ctx.macos_config.capture_auto_top_inset)
+
+    def _update_manual_inset_enabled(self, auto: bool) -> None:
+        """自动模式保留原值，只禁用手动控件。"""
+        self.macos_top_inset_opt.setEnabled(not auto)
+        self.macos_top_inset_points_opt.setEnabled(not auto)
+
+    def _on_auto_top_inset_changed(self, value: bool) -> None:
+        """切换裁剪方式后更新控件并停止旧连接。"""
+        self._update_manual_inset_enabled(value)
+        self._on_mac_config_changed(value)
 
     def _on_mac_platform_changed(self, index: int, value: str) -> None:
         """平台选择已由适配器保存，终止旧连接并等待重新启动。"""

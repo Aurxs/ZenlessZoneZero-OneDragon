@@ -138,7 +138,13 @@ class MacBootstrapGameSession(Operation):
 
                     controller = self.ctx.controller
                     points = getattr(controller.macos_config,'capture_top_inset_points',0)
-                    if points:
+                    if controller.macos_config.capture_auto_top_inset:
+                        self._pointer = MacBootstrapPointer(
+                            controller.window_capture.window,
+                            window_capture=controller.window_capture,
+                            auto_top_inset=True, foreground=True,
+                        )
+                    elif points:
                         self._pointer = MacBootstrapPointer(
                             controller.window_capture.window,window_capture=controller.window_capture,
                             top_inset_points=points,foreground=True,

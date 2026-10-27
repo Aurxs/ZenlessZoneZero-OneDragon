@@ -189,7 +189,7 @@ def screenshot(self, independent: bool = False) -> tuple[float, MatLike | None]:
 
 按 bundle ID / PID / window ID 绑定游戏窗口，使用窗口级过滤，不采当前活动应用。音频和鼠标指针首版关闭。窗口重建后重新选择并清空旧帧，不能沿用旧 ID。
 
-输出遵守现有 RGB `uint8`、1920×1080 约定。顶部标题栏通过显式 `capture_top_inset_pixels` 传给 `MacWindowCapture.start(top_inset_pixels=...)`，默认 0，不自动猜测；游戏设置页提供整数控件，本机确认值为 56。每帧按当前完整宽高裁去顶部后严格验证 16:9，正常窗口缩放仍可归一化，不要求固定窗口尺寸；错误比例不能靠拉伸通过。帧监测读取 `latest_frame()`，长按期间比例失效也会暂停输入；其他窗口装饰/黑边仅在有明确内容区依据时处理。不通过强行拉伸来掩盖 iOS UI 差异。转换点/像素属于宿主截图正确性，不新增通用任意分辨率框架。
+输出遵守现有RGB `uint8`、1920×1080约定。当前账户`capture_auto_top_inset`默认开启，通过`MacWindowCapture.start(auto_top_inset=True)`按每帧宽度和底边推算16:9游戏顶部，随窗口缩放自动重算；顶部余量限制为0至64逻辑点，允许一个输出像素的取整误差。启动点击共用推算规则。关闭自动模式后仍支持原逻辑点/旧像素参数，具体边界见[采集缩放](application/macos_capture_scaling.md)。帧监测读取`latest_frame()`，长按期间窗口几何失效也会暂停输入；保留帧龄与比例检查，不识别左右/底部黑边，不以裁后比例正确单独证明画面有效。转换点/像素属于宿主截图正确性，不新增通用任意分辨率框架。
 
 原 `ControllerBase.screenshot()` 使用调用时间；`ZMacController.screenshot()` 已覆盖为返回真实采集时间，避免旧帧被误判为新画面。过期、权限撤销或停止采集时返回无帧并暂停输入。采集时钟到现有时间基准的换算集中处理，不直接把系统 uptime 当 epoch 时间使用。
 

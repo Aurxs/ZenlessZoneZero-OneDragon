@@ -18,6 +18,7 @@ from one_dragon.base.controller.macos.main_thread_dispatch import (
     MacMainThreadError,
     perform_on_main_thread,
 )
+from one_dragon.base.controller.macos.sck_frame_converter import infer_game_top_inset
 from one_dragon.utils.log_utils import log
 
 if TYPE_CHECKING:
@@ -86,11 +87,14 @@ def game_point_to_screen(
     *,
     top_inset_pixels: int = 0,
     top_inset_points: float = 0,
+    auto_top_inset: bool = False,
 ) -> tuple[float, float]:
-    """把标准游戏内容坐标换成当前窗口内的全局逻辑点，拒绝猜测裁剪。"""
+    """把标准游戏内容坐标换成当前窗口内的全局逻辑点。"""
     _validate_binding(window, top_inset_pixels)
     if not math.isfinite(top_inset_points) or top_inset_points < 0 or (top_inset_points and top_inset_pixels):
         raise ValueError('启动裁剪逻辑点无效或与像素配置冲突')
+    if type(auto_top_inset) is not bool or (auto_top_inset and (top_inset_points or top_inset_pixels)):
+        raise ValueError('自动顶部裁剪选项无效或与手动裁剪冲突')
     if (current.bundle_id, current.pid, current.window_id) != (
         window.bundle_id,
         window.pid,
@@ -116,7 +120,13 @@ def game_point_to_screen(
     if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < 1920 and 0 <= y < 1080):
         raise MacBootstrapError('启动点击坐标必须在 1920×1080 游戏内容范围内')
 
-    top_inset_points = top_inset_points or top_inset_pixels / current.pixels_per_point
+    if auto_top_inset:
+        try:
+            top_inset_points = infer_game_top_inset(current.width, current.height)
+        except ValueError as error:
+            raise MacBootstrapError(str(error)) from error
+    else:
+        top_inset_points = top_inset_points or top_inset_pixels / current.pixels_per_point
     content_height = current.height - top_inset_points
     if content_height <= 0 or not math.isclose(
         current.width / content_height, 16 / 9, rel_tol=0.002
@@ -145,6 +155,7 @@ class MacBootstrapPointer:
         *,
         top_inset_pixels: int = 0,
         top_inset_points: float = 0,
+        auto_top_inset: bool = False,
         window_capture: MacWindowCapture | None = None,
         foreground: bool = False,
     ) -> None:
@@ -152,11 +163,14 @@ class MacBootstrapPointer:
         _validate_binding(window, top_inset_pixels)
         if not math.isfinite(top_inset_points) or top_inset_points < 0 or (top_inset_points and top_inset_pixels):
             raise ValueError('启动裁剪逻辑点无效或与像素配置冲突')
+        if type(auto_top_inset) is not bool or (auto_top_inset and (top_inset_points or top_inset_pixels)):
+            raise ValueError('自动顶部裁剪选项无效或与手动裁剪冲突')
         if type(foreground) is not bool:
             raise ValueError('前台启动点击选项必须是布尔值')
         self._window: MacWindow = window
         self._top_inset_pixels: int = top_inset_pixels
         self._top_inset_points: float = top_inset_points
+        self._auto_top_inset: bool = auto_top_inset
         self._foreground: bool = foreground
         self._capture: MacWindowCapture = (
             window_capture if window_capture is not None else MacWindowCapture()
@@ -252,6 +266,7 @@ class MacBootstrapPointer:
             y,
             top_inset_pixels=self._top_inset_pixels,
             top_inset_points=self._top_inset_points,
+            auto_top_inset=self._auto_top_inset,
         )
 
     def click(self, x: float, y: float, *, press_seconds: float = 0.05) -> bool:

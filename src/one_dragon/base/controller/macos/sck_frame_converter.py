@@ -56,23 +56,48 @@ def bgra_buffer_to_rgb(
     return cv2.cvtColor(bgra, cv2.COLOR_BGRA2RGB)
 
 
+def infer_game_top_inset(width: float, height: float, *, pixel_scale: float = 1.0) -> float:
+    """按铺满宽度、底边对齐的 16:9 内容推算顶部，最多允许 64 逻辑点装饰。
+
+    宽高和返回值使用同一单位；逻辑点调用保持 pixel_scale=1。
+    允许一个输出像素的取整误差，不把明显错误的窗口比例裁成正常画面。
+    本规则不识别左右或底部黑边，只适用于已约定的 PlayCover 窗口布局。
+    """
+    if not all(math.isfinite(value) and value > 0 for value in (width, height, pixel_scale)):
+        raise ValueError('自动裁剪的窗口尺寸或像素缩放无效')
+    inset = height - width * 9 / 16
+    if not -1 <= inset <= 64 * pixel_scale + 1:
+        raise ValueError('窗口不能按底边推算 16:9 内容：顶部余量须在 0 至 64 逻辑点内')
+    return max(0.0, inset)
+
+
 def normalize_game_frame(
     image: NDArray[np.uint8],
     *,
     content_rect: tuple[int, int, int, int] | None = None,
     top_inset_pixels: int = 0,
+    auto_top_inset: bool = False,
+    pixel_scale: float = 1.0,
 ) -> NDArray[np.uint8]:
     """把明确的 16:9 游戏内容转成 1080p，拒绝拉伸其他比例。
 
     content_rect 是去除 SCK 填充后的图片内、已经确认的游戏区像素坐标。
     top_inset_pixels 只去掉已确认的顶部标题栏，保留每帧剩余完整宽高；
     非零时不能与 content_rect 同时使用。
-    不自动猜测标题栏或黑边；未指定时要求整张内容区为 16:9。
+    auto_top_inset 按当前帧宽度和底边推算顶部，与手动裁剪互斥。
+    未指定裁剪方式时要求整张内容区为 16:9。
     """
     if image.dtype != np.uint8 or image.ndim != 3 or image.shape[2] != 3:
         raise ValueError('游戏截图必须是 RGB uint8 图片')
     if type(top_inset_pixels) is not int or top_inset_pixels < 0:
         raise ValueError('顶部裁剪像素必须是非负整数')
+    if type(auto_top_inset) is not bool:
+        raise ValueError('自动顶部裁剪选项必须是布尔值')
+    if auto_top_inset:
+        if top_inset_pixels or content_rect is not None:
+            raise ValueError('自动顶部裁剪不能同时使用手动裁剪')
+        height, width = image.shape[:2]
+        top_inset_pixels = round(infer_game_top_inset(width, height, pixel_scale=pixel_scale))
     if top_inset_pixels and content_rect is not None:
         raise ValueError('顶部裁剪和固定游戏内容区不能同时使用')
     if top_inset_pixels >= image.shape[0]:

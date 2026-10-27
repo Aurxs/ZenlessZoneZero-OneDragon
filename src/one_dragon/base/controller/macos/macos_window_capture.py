@@ -148,6 +148,7 @@ class MacWindowCapture:
         self._content_rect: tuple[int, int, int, int] | None = None
         self._top_inset_pixels: int = 0
         self._top_inset_points: float = 0
+        self._auto_top_inset: bool = False
         self.window: MacWindow | None = None
 
     @property
@@ -254,8 +255,9 @@ class MacWindowCapture:
         content_rect: tuple[int, int, int, int] | None = None,
         top_inset_pixels: int = 0,
         top_inset_points: float = 0,
+        auto_top_inset: bool = False,
     ) -> None:
-        """绑定窗口；像素、逻辑点裁剪和固定游戏区只能选一种。"""
+        """绑定窗口；自动、像素、逻辑点裁剪和固定游戏区只能选一种。"""
         if not 1 <= fps <= 120:
             raise ValueError('采集帧率必须在 1 到 120 之间')
         if type(top_inset_pixels) is not int or top_inset_pixels < 0:
@@ -266,6 +268,10 @@ class MacWindowCapture:
             raise ValueError('不能同时指定顶部裁剪像素和逻辑点')
         if (top_inset_pixels or top_inset_points) and content_rect is not None:
             raise ValueError('顶部裁剪和固定游戏内容区不能同时使用')
+        if type(auto_top_inset) is not bool:
+            raise ValueError('自动顶部裁剪选项必须是布尔值')
+        if auto_top_inset and (top_inset_pixels or top_inset_points or content_rect is not None):
+            raise ValueError('自动顶部裁剪不能同时使用手动裁剪')
         self.stop()
         cm, dispatch, _, quartz, sck, output_class = _native_api()
         selected = None
@@ -316,6 +322,7 @@ class MacWindowCapture:
             self._content_rect = content_rect
             self._top_inset_pixels = top_inset_pixels
             self._top_inset_points = top_inset_points
+            self._auto_top_inset = auto_top_inset
             self.window = window
         try:
             error, = self._wait(stream.startCaptureWithCompletionHandler_, '启动窗口采集')
@@ -425,8 +432,8 @@ class MacWindowCapture:
                 raise MacCaptureError('采集帧缺少有效内容区')
             scale_factor = float(metadata[sck.SCStreamFrameInfoScaleFactor])
             content_scale_key = getattr(sck,'SCStreamFrameInfoContentScale',None)
-            if self._top_inset_points and content_scale_key not in metadata:
-                raise MacCaptureError('逻辑点裁剪需要采集帧的内容缩放元数据')
+            if (self._top_inset_points or self._auto_top_inset) and content_scale_key not in metadata:
+                raise MacCaptureError('自动或逻辑点裁剪需要采集帧的内容缩放元数据')
             content_scale = float(metadata.get(content_scale_key,1.0))
             # 标题栏来自原窗口逻辑点，须包括内容缩放；contentRect本身已经包含该缩放。
             pixel_scale = scale_factor * content_scale
@@ -502,6 +509,7 @@ class MacWindowCapture:
             content_rect = self._content_rect
             top_inset_pixels = self._top_inset_pixels
             top_inset_points = self._top_inset_points
+            auto_top_inset = self._auto_top_inset
         frame = self.latest_raw_frame(max_age_seconds=max_age_seconds)
         if frame is None:
             return None
@@ -512,6 +520,7 @@ class MacWindowCapture:
                 top_inset_pixels = round(top_inset_points * frame.pixel_scale)
             image = normalize_game_frame(
                 frame.image, content_rect=content_rect, top_inset_pixels=top_inset_pixels,
+                auto_top_inset=auto_top_inset, pixel_scale=frame.pixel_scale,
             )
         except ValueError as error:
             with self._lock:
@@ -543,6 +552,7 @@ class MacWindowCapture:
             self._content_rect = None
             self._top_inset_pixels = 0
             self._top_inset_points = 0
+            self._auto_top_inset = False
         if output is not None:
             output.bind(None)
         if stream is not None:

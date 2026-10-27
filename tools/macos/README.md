@@ -83,4 +83,4 @@ python3 tools/macos/gamepad_probe.py --ojd /实际路径/ojd --action combo --bu
 
 本机 Safari 和游戏均已识别 OJD 虚拟手柄；此前原始持久 CLI 的 East 100ms 返回菜单，游戏后台 South 100ms 进入登录奖励页。该结果证明基础输入链路，不代表战斗、持续后台渲染或完整任务通过。命令行 GameController 观察器曾枚举为 0，不能覆盖实际应用的阳性结果，不再为此扩展排查。
 
-项目现已新增 `GamepadInput`、`OjdGamepadClient`、窗口采集和 `ZMacController`，探测脚本仍保持独立。显式顶部裁剪默认 0，本机确认 56px，游戏设置页可配置；每帧按当前宽高裁顶部并检查 16:9，不要求固定窗口尺寸。Mac GUI 源码入口为 `PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main`；须先在游戏设置页显式选择 Mac 平台并准备模型。开发阶段、聚焦测试及真实采集结果以[实施进度](../../docs/develop/zzz/macos_migration_progress.md)为准。
+项目现已新增 `GamepadInput`、`OjdGamepadClient`、窗口采集和 `ZMacController`，探测脚本仍保持独立。游戏设置默认开启“自动适配游戏窗口”，按每帧宽度和底边推算16:9内容，放大缩小后自动适配；关闭后可使用保留的逻辑点/旧像素裁剪参数。前提和异常尺寸限制见[采集缩放](../../docs/develop/zzz/application/macos_capture_scaling.md)。Mac GUI 源码入口为 `PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main`；须先在游戏设置页显式选择 Mac 平台并准备模型。开发阶段、聚焦测试及真实采集结果以[实施进度](../../docs/develop/zzz/macos_migration_progress.md)为准。
