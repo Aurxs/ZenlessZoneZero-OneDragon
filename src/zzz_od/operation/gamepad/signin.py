@@ -112,7 +112,11 @@ class GamepadDailySignIn(GamepadOperation):
 
     def _main_visible(self) -> bool:
         """主界面文字保留在已完成态，不能仅凭占卜提示判断可领取。"""
-        return self._found('手柄-标题') and self._found('手柄-占卜提示')
+        return self._found('手柄-标题') and (
+            self._found('手柄-占卜提示')
+            or self._found('手柄-可占卜封面')
+            or self._found('手柄-已完成封面')
+        )
 
     def _main_state(self) -> str | None:
         """用中央開/闭封面模板区分可占卜和已完成，不重复开始。"""
