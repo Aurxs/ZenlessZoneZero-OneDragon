@@ -58,7 +58,7 @@ def get_macos_app_limits(app_id: str) -> str:
         'notorious_hunt': 'Mac 已验证库萨里库免费挑战、GUI 难度与编队、周期领奖；其他 Boss 和深度追猎尚未开放',
         'ridu_weekly': 'Mac 支持领取已完成九宫格积分与积分特赏，不代做周任务',
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,
-        random_play_const.APP_ID: 'Mac 支持澄辉坪营业点、随机或已选宣传员和推荐上架；指定人物移焦尚未支持',
+        random_play_const.APP_ID: 'Mac 支持澄辉坪营业点、随机或按原候选配置定位并确认宣传员、推荐上架；指定仪玄分支已验，其他人物待实测，营业中不更换',
         coffee_app_const.APP_ID: 'Mac 已验证澄辉坪汀曼特调与今日已喝；其他入口和额外咖啡尚未实测',
         engagement_reward_const.APP_ID: 'Mac 支持活跃度领奖、满档判断及已领取跳过',
         city_fund_const.APP_ID: 'Mac 支持现有成长任务与等级奖励领取，不购买等级或升级计划',

@@ -85,6 +85,12 @@ def shop_name(text: str) -> str:
     return ''.join(text.split()).strip('「」『』')
 
 
+def promoter_name(text: str) -> str:
+    """宣传页使用柚叶简称，配置仍沿原代理人全名。"""
+    name = shop_name(text)
+    return {'柚叶': '浮波柚叶'}.get(name, name)
+
+
 def business_card_titles(operation: Operation) -> list[str | None]:
     """从主页面四列标题读取实际宣传员与影片，空卡不算准备完成。"""
     read = read_shop_area(operation, '手柄-卡片标题')
@@ -101,7 +107,7 @@ def business_card_titles(operation: Operation) -> list[str | None]:
             continue
         index = min(range(4), key=lambda item: abs(centers[item] - match.center.x))
         if abs(centers[index] - match.center.x) < 115:
-            titles[index] = name
+            titles[index] = promoter_name(name) if index == 0 else name
     return titles
 
 
@@ -136,11 +142,15 @@ def focused_promoter_name(operation: Operation, valid_names: set[str]) -> str | 
         return None
     x, y, width, height = frames[0]
     names = {
-        shop_name(text) for text, matches in results.items()
-        if matches.max is not None and shop_name(text) in valid_names
+        promoter_name(text) for text, matches in results.items()
+        if matches.max is not None and promoter_name(text) in valid_names
         and x <= matches.max.center.x <= x + width
         and y + height - 70 <= matches.max.center.y <= y + height
     }
+    if not names:
+        detail = read_shop_area(operation, '手柄-宣传员详情名称')
+        if detail is not None:
+            names = {promoter_name(text) for text in detail[1] if promoter_name(text) in valid_names}
     return next(iter(names)) if len(names) == 1 else None
 
 

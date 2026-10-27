@@ -172,3 +172,11 @@ added_areas:
   - 460
   - 1300
   - 755
+- area_name: 手柄-宣传员详情名称
+  area_type: text
+  pc_rect:
+  - 50
+  - 115
+  - 480
+  - 205
+  lcs_percent: 0.5

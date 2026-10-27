@@ -130,14 +130,24 @@ class RandomPlayApp(GamepadMenuDelayMixin, ZApplication):
             '诚信经营，丁尼为本', '丁尼广进，生意兴隆',
         ))
 
+    def _macos_promoter_candidates(self) -> list[str]:
+        """候选顺序沿用原应用的日期轮换。"""
+        candidates = [self.config.agent_name_1, self.config.agent_name_2]
+        if RANDOM_AGENT_NAME not in candidates and int(self.run_record.get_current_dt()[-1]) % 2:
+            candidates.reverse()
+        return candidates
+
     def _macos_choose_promoter(self) -> OperationRoundResult:
-        """随机配置确认当前合法焦点，指定人物只接受当前已识别焦点，不滚屏替换。"""
+        """保留原配置顺序，指定人物先定位再复用原确认与主页核验。"""
         valid_agents = {item.value.agent_name for item in AgentEnum} | {'邦布18'}
+        candidates = self._macos_promoter_candidates()
         if self._macos_business_visible():
             actual = business_card_titles(self)[0]
             if actual in valid_agents:
                 if self._macos_selected_promoter is not None and actual != self._macos_selected_promoter:
                     return fail_shop_state(self, '影像店营业', '主页面宣传员与刚才确认的人物不同')
+                if self._macos_selected_promoter is None and RANDOM_AGENT_NAME not in candidates and actual != candidates[0]:
+                    return self._macos_open_card(0, '宣传员入口')
                 self._macos_promoter_ready = True
                 return self.round_success()
         if self._macos_promoter_confirm_sent:
@@ -149,17 +159,30 @@ class RandomPlayApp(GamepadMenuDelayMixin, ZApplication):
         selected = focused_promoter_name(self, valid_agents)
         if selected is None:
             return fail_shop_state(self, '影像店营业', '无法确认合法宣传员的唯一卡片焦点')
-        candidates = [self.config.agent_name_1, self.config.agent_name_2]
         if RANDOM_AGENT_NAME not in candidates:
-            if int(self.run_record.get_current_dt()[-1]) % 2:
-                candidates.reverse()
             if selected != candidates[0]:
-                return fail_shop_state(self, '影像店营业', f'当前焦点是{selected}，指定宣传员{candidates[0]}尚未验证移焦')
+                from zzz_od.operation.gamepad.promoter import GamepadFocusPromoter
+
+                result = GamepadFocusPromoter(self.ctx, candidates, self.get_pos_by_avatar).execute()
+                if not result.success:
+                    return self.round_by_op_result(result)
+                selected = result.data['agent_name']
+                self.last_screenshot_time, self.last_screenshot = self.ctx.controller.screenshot()
+                if focused_promoter_name(self, valid_agents) != selected:
+                    return fail_shop_state(self, '影像店营业', '指定人物移焦后未确认同一焦点，未发送确认')
+            from zzz_od.operation.gamepad.promoter import GamepadConfirmPromoter
+
+            result = GamepadConfirmPromoter(self.ctx, selected).execute()
+            if result.success:
+                self._macos_selected_promoter = selected
+                self._macos_promoter_confirm_sent = True
+                self._macos_promoter_ready = True
+            return self.round_by_op_result(result)
         self._macos_selected_promoter = selected
-        self._macos_promoter_confirm_sent = True
         result = press_shop_action(self, '影像店营业', '确认宣传员')
         if not result.is_success:
             return result
+        self._macos_promoter_confirm_sent = True
         return self.round_retry(f'已确认{selected}，等待主页面', wait=0.5)
 
     def _macos_open_card(self, target: int, action_name: str) -> OperationRoundResult:
@@ -326,7 +349,9 @@ class RandomPlayApp(GamepadMenuDelayMixin, ZApplication):
         :return:
         """
         if sys.platform == 'darwin':
-            if business_card_titles(self)[0] in {item.value.agent_name for item in AgentEnum} | {'邦布18'}:
+            actual = business_card_titles(self)[0]
+            candidates = self._macos_promoter_candidates()
+            if actual in {item.value.agent_name for item in AgentEnum} | {'邦布18'} and (RANDOM_AGENT_NAME in candidates or actual == candidates[0]):
                 self._macos_promoter_ready = True
                 return self.round_success()
             return self._macos_open_card(0, '宣传员入口')
