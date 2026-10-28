@@ -251,10 +251,21 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         if choices is not None:
             rows = [(text, matches.max) for text, matches in choices[1].items()
                     if text.strip() and text.strip() != 'A' and matches.max is not None and matches.max.x >= 100]
-            focused = [text for text, match in rows if has_filled_highlight(choices[0], match.rect, 'yellow')]
+            focused = [match for _, match in rows if has_filled_highlight(choices[0], match.rect, 'yellow')]
             if rows and len(focused) == 1:
                 from zzz_od.operation.gamepad.dialog import GamepadChooseDialogOption
 
+                # 鸣徽卡片的黄色数量也可能落入选项带，同行左侧 A 才能证明是对话焦点。
+                prompts = [matches.max for text, matches in choices[1].items()
+                           if text.strip() == 'A' and matches.max is not None]
+                if not prompts:
+                    prompts = list(self.ctx.tm.match_template(
+                        choices[0], 'ios_gamepad', 'dialog_a', threshold=0.8,
+                    ))
+                current = focused[0]
+                if not any(prompt.x + prompt.w < current.x and abs(prompt.center.y - current.center.y)
+                           <= max(40, prompt.h, current.h) for prompt in prompts):
+                    return None
                 rows.sort(key=lambda item: item[1].center.y)
                 target = rows[self.talk_opt_idx % len(rows)][0]
                 result = GamepadChooseDialogOption(self.ctx, target, prompt_threshold=0.8).execute()
