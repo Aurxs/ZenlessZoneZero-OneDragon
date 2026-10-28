@@ -236,6 +236,15 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
             return None
         nav = GamepadTransportByCompendium(self.ctx, '作战', '周期征讨')
         nav.last_screenshot = screen
+        # 事件旁白采用中央文字和A提示，与普通加载黑屏、底部对话框分开确认。
+        if np.mean(np.max(screen, axis=2) < 40) > 0.97 and self.round_by_find_area(
+            screen, '迷失之地-大世界', '手柄-事件继续',
+        ).is_success:
+            narration = nav._read_area('迷失之地-大世界', '手柄-事件文字')
+            body = ''.join(text.strip() for text, matches in narration[1].items()
+                           if matches.max is not None) if narration is not None else ''
+            if body:
+                return self._advance_dialog(body, '事件文字')
         area = nav._read_area('迷失之地-大世界', '手柄-对话框')
         if area is None:
             return None
@@ -278,23 +287,27 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
                           and matches.max.center.x > 1040 and matches.max.center.y > 190
                           for text, matches in area[1].items())
         if prompt.is_success or prompt_text:
-            now = time.monotonic()
-            if (self.last_screenshot_time <= self._dialog_frame_time
-                    or now - self._dialog_sent_at < 1):
-                return self.round_wait('等待对话推进后的新帧', wait=0.5)
-            if body != self._dialog_text:
-                self._dialog_text = body
-                self._dialog_repeats = 0
-            if self._dialog_repeats >= 3:
-                self.save_screenshot(prefix='macos_lost_void_dialog_stalled')
-                return self.round_fail('对话推进未取得进展，已停止')
-            self._dialog_frame_time = self.last_screenshot_time
-            self._dialog_sent_at = now
-            self._dialog_repeats += 1
-            self.talk_opt_idx = 0
-            self.ctx.controller.btn_tap('south')
-            return self.round_wait(f'推进局内对话：{names[0] if len(names) == 1 else "台词"}', wait=0.8)
+            return self._advance_dialog(body, names[0] if len(names) == 1 else '台词')
         return None
+
+    def _advance_dialog(self, body: str, label: str) -> OperationRoundResult:
+        """已确认的底部对话和中央事件文字共用新帧、间隔及同页重试保护。"""
+        now = time.monotonic()
+        if (self.last_screenshot_time <= self._dialog_frame_time
+                or now - self._dialog_sent_at < 1):
+            return self.round_wait('等待对话推进后的新帧', wait=0.5)
+        if body != self._dialog_text:
+            self._dialog_text = body
+            self._dialog_repeats = 0
+        if self._dialog_repeats >= 3:
+            self.save_screenshot(prefix='macos_lost_void_dialog_stalled')
+            return self.round_fail('对话推进未取得进展，已停止')
+        self._dialog_frame_time = self.last_screenshot_time
+        self._dialog_sent_at = now
+        self._dialog_repeats += 1
+        self.talk_opt_idx = 0
+        self.ctx.controller.btn_tap('south')
+        return self.round_wait(f'推进局内对话：{label}', wait=0.8)
 
     @node_from(from_name='非战斗画面识别', status='需要更新优先级')
     @operation_node(name='更新优先级')
@@ -322,6 +335,9 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
             self.room_inited_times = 0
             return self.round_success('大世界')
         if np.mean(np.max(self.last_screenshot, axis=2) < 12) > 0.95:
+            talk = self.try_talk(self.last_screenshot)
+            if talk is not None:
+                return talk
             return self.round_retry('等待区域加载', wait=1)
         nav = GamepadTransportByCompendium(self.ctx, '作战', '周期征讨')
         nav.last_screenshot = self.last_screenshot

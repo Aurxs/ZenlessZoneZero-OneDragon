@@ -1,0 +1,8 @@
+sub_dir: ios_gamepad
+template_id: lost_void_narration_a
+template_name: 迷失之地黑底事件继续
+template_shape: circle
+auto_mask: true
+point_list:
+- 961, 577
+- 981, 577

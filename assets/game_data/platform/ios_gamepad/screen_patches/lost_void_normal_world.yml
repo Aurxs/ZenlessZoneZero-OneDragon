@@ -81,3 +81,21 @@ added_areas:
   template_sub_dir: ios_gamepad
   template_id: lost_void_npc_gear
   template_match_threshold: 0.8
+- area_name: 手柄-事件文字
+  area_type: none
+  pc_rect:
+  - 320
+  - 450
+  - 1600
+  - 550
+- area_name: 手柄-事件继续
+  area_type: template
+  pc_rect:
+  - 931
+  - 547
+  - 991
+  - 607
+  template_sub_dir: ios_gamepad
+  template_id: lost_void_narration_a
+  template_match_threshold: 0.9
+  gamepad_key: south
