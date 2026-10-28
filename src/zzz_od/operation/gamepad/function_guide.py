@@ -46,7 +46,7 @@ class GamepadOpenFunction(_GamepadRewardOperation):
             if area is None:
                 return self.round_retry('等待功能卡片', wait=0.6)
             image, words = area
-            frames = find_yellow_focus_frames(image, 100, 175, 100, 180)
+            frames = find_yellow_focus_frames(image, 100, 175, 100, 180, min_edge_presence=0.65)
             target = self._text_rect(words, self.target)
             if len(frames) == 1 and target is None and self.scroll_to_missing and self._scan_count < 6:
                 signature = (frames[0].x1, frames[0].y1, tuple(sorted(words)))

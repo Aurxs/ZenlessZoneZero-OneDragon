@@ -27,6 +27,7 @@ def find_yellow_focus_frames(
     max_width: int,
     min_height: int,
     max_height: int,
+    min_edge_presence: float | None = None,
 ) -> list[Rect]:
     """检查大卡片或小传送点的四边，排除黄色图案和按钮圆标。"""
     mask = highlight_mask(image, 'yellow')
@@ -38,7 +39,13 @@ def find_yellow_focus_frames(
             continue
         crop = mask[y:y + height, x:x + width]
         edges = (crop[:8], crop[-8:], crop[:, :8], crop[:, -8:])
-        if all(np.count_nonzero(edge) / edge.size >= 0.4 for edge in edges):
+        if min_edge_presence is None:
+            matched = all(np.count_nonzero(edge) / edge.size >= 0.4 for edge in edges)
+        else:
+            # 功能卡片圆角与呼吸动画会改变线宽，按四边出现的跨度确认闭合框。
+            matched = all(np.count_nonzero(np.any(edge, axis=axis)) / edge.shape[1 - axis] >= min_edge_presence
+                          for edge, axis in zip(edges, (0, 0, 1, 1), strict=True))
+        if matched:
             frames.append(Rect(x, y, x + width, y + height))
     return frames
 
