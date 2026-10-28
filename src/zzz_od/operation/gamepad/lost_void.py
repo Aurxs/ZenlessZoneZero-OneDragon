@@ -22,6 +22,8 @@ from zzz_od.operation.gamepad.transport_by_compendium import (
 )
 
 if TYPE_CHECKING:
+    from cv2.typing import MatLike
+
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.context.zzz_context import ZContext
 
@@ -401,14 +403,7 @@ class GamepadLostVoidChooseMission(GamepadOperation):
         if area is None:
             return self.round_retry('等待副本卡片', wait=1)
         image, words = area
-        # 银色箭头和通关后的红色叹号会分别截断竖边、横边，仅在此列表闭合小缺口。
-        mask = cv2.morphologyEx(highlight_mask(image, 'yellow'), cv2.MORPH_CLOSE, np.ones((35, 35), np.uint8))
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        frames = []
-        for contour in contours:
-            x, y, width, height = cv2.boundingRect(contour)
-            if width >= 450 and 150 <= height <= 500 and cv2.contourArea(contour) / width / height >= 0.75:
-                frames.append(Rect(x, y, x + width, y + height))
+        frames = self._find_mission_frames(image)
         names = ('特殊行动', '战线肃清', '特遣调查', '祸首歼灭战', '溯影行动', '矩阵行动')
         visible = {name: rect for name in names if (rect := nav._text_rect(words, name)) is not None}
         selected = [name for name, rect in visible.items() if text_inside_frame(rect, frames)]
@@ -426,6 +421,35 @@ class GamepadLostVoidChooseMission(GamepadOperation):
                 else ('dpad_down' if dy > 0 else 'dpad_up')
             )
         return self.round_retry('等待副本卡片选择', wait=1)
+
+    @staticmethod
+    def _find_mission_frames(image: MatLike) -> list[Rect]:
+        """逐边核对卡片焦点，允许箭头和通知的局部遮挡，不用闭合把NEW连入边框。"""
+        mask = highlight_mask(image, 'yellow') > 0
+        contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        frames: list[Rect] = []
+        for contour in contours:
+            x, y, width, height = cv2.boundingRect(contour)
+            if width < 400 or not 150 <= height <= 500:
+                continue
+            # 通知与箭头同时遮挡时，左上短边可能与主体断开，仅在相邻60像素找回。
+            x1, x2 = max(0, x - 60), min(mask.shape[1], x + width + 60)
+            rows = np.flatnonzero(mask[y:y + height, x1:x2].mean(axis=1) >= 0.65)
+            if len(rows) < 2:
+                continue
+            top, bottom = y + int(rows[0]), y + int(rows[-1]) + 1
+            columns = np.flatnonzero(mask[top:bottom, x1:x2].mean(axis=0) >= 0.5)
+            if len(columns) < 2:
+                continue
+            left, right = x1 + int(columns[0]), x1 + int(columns[-1]) + 1
+            if right - left < 450 or not 150 <= bottom - top <= 500:
+                continue
+            border = mask[top:bottom, left:right]
+            horizontal = min(border[:12].any(axis=0).mean(), border[-12:].any(axis=0).mean())
+            vertical = min(border[:, :12].any(axis=1).mean(), border[:, -12:].any(axis=1).mean())
+            if horizontal >= 0.75 and vertical >= 0.6:
+                frames.append(Rect(left, top, right, bottom))
+        return frames
 
 
 class GamepadLostVoidOpenStrategy(GamepadOperation):
