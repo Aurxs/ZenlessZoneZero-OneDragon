@@ -129,6 +129,8 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         self._leave_sent: bool = False
         self._last_unmatched_balance: int | None = None
         self._unplanned_cancel_count: int = 0
+        self._empty_goods_frames: int = 0
+        self._empty_goods_frame_time: float = -1
 
     def _balance(self) -> int | None:
         """余额栏只接受一个完整数字，不把刷新费用当成可用余额。"""
@@ -304,15 +306,25 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         gold, blood = self._currency_flags()
         if blood and not config.store_blood or gold and not config.store_gold:
             return self._leave()
+        all_goods, goods = self._goods()
+        if len(all_goods) < 4:
+            self._empty_goods_frames = 0
+            return self.round_retry('等待完整商店商品识别', wait=1)
+        if all(item.store_buy_rect is None and item.store_price is None for item in all_goods):
+            if self.last_screenshot_time > self._empty_goods_frame_time:
+                self._empty_goods_frames += 1
+                self._empty_goods_frame_time = self.last_screenshot_time
+            if self._empty_goods_frames >= 2:
+                self.save_screenshot(prefix='macos_lost_void_store_no_goods')
+                return self._leave()
+            return self.round_wait('复核本页已无可购买项', wait=0.6)
+        self._empty_goods_frames = 0
         if not gold or blood:
             self.save_screenshot(prefix='macos_lost_void_store_currency_pending')
             return self.round_fail('商店货币或血量费用尚未确认，未购买')
         balance = self._balance()
         if balance is None:
             return self.round_retry('等待唯一商店余额', wait=1)
-        all_goods, goods = self._goods()
-        if len(all_goods) < 4:
-            return self.round_retry('等待完整商店商品识别', wait=1)
         if any(
             item.store_buy_rect is not None and item.store_price is None
             for item in all_goods

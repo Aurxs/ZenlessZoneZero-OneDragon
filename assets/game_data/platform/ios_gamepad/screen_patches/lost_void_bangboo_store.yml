@@ -38,9 +38,9 @@ added_areas:
 - area_name: 手柄-商品金币-1
   area_type: template
   pc_rect:
-  - 305
+  - 170
   - 732
-  - 357
+  - 562
   - 784
   template_sub_dir: lost_void
   template_id: ios_store_goods_gold
@@ -48,9 +48,9 @@ added_areas:
 - area_name: 手柄-商品金币-2
   area_type: template
   pc_rect:
-  - 695
+  - 562
   - 732
-  - 747
+  - 954
   - 784
   template_sub_dir: lost_void
   template_id: ios_store_goods_gold
@@ -58,9 +58,9 @@ added_areas:
 - area_name: 手柄-商品金币-3
   area_type: template
   pc_rect:
-  - 1085
+  - 954
   - 732
-  - 1137
+  - 1346
   - 784
   template_sub_dir: lost_void
   template_id: ios_store_goods_gold
@@ -68,9 +68,9 @@ added_areas:
 - area_name: 手柄-商品金币-4
   area_type: template
   pc_rect:
-  - 1474
+  - 1346
   - 732
-  - 1526
+  - 1738
   - 784
   template_sub_dir: lost_void
   template_id: ios_store_goods_gold
