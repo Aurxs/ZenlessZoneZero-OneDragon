@@ -401,8 +401,8 @@ class GamepadLostVoidChooseMission(GamepadOperation):
         if area is None:
             return self.round_retry('等待副本卡片', wait=1)
         image, words = area
-        # 卡片左侧银色箭头会截断黄色竖边，只在这个已知列表纵向闭合缺口。
-        mask = cv2.morphologyEx(highlight_mask(image, 'yellow'), cv2.MORPH_CLOSE, np.ones((35, 9), np.uint8))
+        # 银色箭头和通关后的红色叹号会分别截断竖边、横边，仅在此列表闭合小缺口。
+        mask = cv2.morphologyEx(highlight_mask(image, 'yellow'), cv2.MORPH_CLOSE, np.ones((35, 35), np.uint8))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         frames = []
         for contour in contours:
