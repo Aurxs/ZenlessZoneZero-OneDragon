@@ -179,6 +179,15 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
             if item.store_buy_rect is not None and item.store_price is not None
         ]
 
+    def _currency_flags(self) -> tuple[bool, bool]:
+        """刷新费用消失时只认商品金币，不用钱包图标代替商品支付方式。"""
+        gold = self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', '标识-金币').is_success
+        blood = self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', '标识-血量').is_success
+        if not gold and not blood:
+            gold = any(self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', f'手柄-商品金币-{idx}').is_success
+                       for idx in range(1, 5))
+        return gold, blood
+
     @staticmethod
     def parse_price(text: str) -> int | None:
         """忽略乘号前的货币图标误读，数字不得截断或与另一组价格混合。"""
@@ -292,12 +301,7 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         if self._leave_sent:
             return self._leave()
         config = self.ctx.lost_void.challenge_config
-        gold = self.round_by_find_area(
-            self.last_screenshot, '迷失之地-邦布商店', '标识-金币'
-        ).is_success
-        blood = self.round_by_find_area(
-            self.last_screenshot, '迷失之地-邦布商店', '标识-血量'
-        ).is_success
+        gold, blood = self._currency_flags()
         if blood and not config.store_blood or gold and not config.store_gold:
             return self._leave()
         if not gold or blood:

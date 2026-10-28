@@ -35,3 +35,43 @@ added_areas:
   - 580
   - 1270
   - 680
+- area_name: 手柄-商品金币-1
+  area_type: template
+  pc_rect:
+  - 305
+  - 732
+  - 357
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold
+  template_match_threshold: 0.9
+- area_name: 手柄-商品金币-2
+  area_type: template
+  pc_rect:
+  - 695
+  - 732
+  - 747
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold
+  template_match_threshold: 0.9
+- area_name: 手柄-商品金币-3
+  area_type: template
+  pc_rect:
+  - 1085
+  - 732
+  - 1137
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold
+  template_match_threshold: 0.9
+- area_name: 手柄-商品金币-4
+  area_type: template
+  pc_rect:
+  - 1474
+  - 732
+  - 1526
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold
+  template_match_threshold: 0.9
