@@ -36,7 +36,7 @@ def validate_macos_hunt_plan(plans: list[ChargePlanItem]) -> str | None:
         return '请先在恶名狩猎设置中添加计划'
     for plan in plans:
         if plan.category_name != '恶名狩猎' or plan.mission_type_name != '库萨里库':
-            return 'Mac 恶名狩猎当前仅实测库萨里库；其他 Boss 尚未适配'
+            return 'Mac 免费恶名计划当前仅开放库萨里库；其他 Boss 的免费奖励链待验证'
         if plan.predefined_team_idx not in range(-1, 20):
             return 'Mac 暂支持当前编队或二十个预备编队'
         if plan.plan_times <= 0 or plan.run_times < 0:
@@ -93,11 +93,14 @@ class GamepadHuntTransport(GamepadOperation):
 
     def __init__(self, ctx: ZContext, mission_type_name: str) -> None:
         """接受原计划副本名，不固定列表首项。"""
-        super().__init__(ctx, op_name=f'手柄传送恶名狩猎 {mission_type_name}', timeout_seconds=60)
+        super().__init__(ctx, op_name=f'手柄传送恶名狩猎 {mission_type_name}', timeout_seconds=150)
         self.target: str = mission_type_name
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(
             ctx, '训练', '恶名狩猎', mission_type_name,
         )
+        self._scan_direction: str = 'up'
+        self._scan_previous: tuple[int, tuple[str, ...]] | None = None
+        self._scan_stuck: int = 0
         self._entered: bool = False
         self._requested: bool = False
 
@@ -106,6 +109,26 @@ class GamepadHuntTransport(GamepadOperation):
         self.navigation.handle_init()
         self._entered = False
         self._requested = False
+        self._scan_direction = 'up'
+        self._scan_previous = None
+        self._scan_stuck = 0
+
+    def _scroll_missing_target(self, focus_y: int, visible_names: tuple[str, ...]) -> OperationRoundResult:
+        """先核对上边界再往下扫描，无反馈时有限重试，不确认其他目标。"""
+        signature = (focus_y // 20, visible_names)
+        self._scan_stuck = self._scan_stuck + 1 if signature == self._scan_previous else 0
+        if self._scan_stuck == 1:
+            return self.round_retry('等待恶名列表滚动反馈', wait=0.6)
+        if self._scan_stuck >= 4:
+            if self._scan_direction == 'up':
+                self._scan_direction = 'down'
+                self._scan_stuck = 0
+            else:
+                self.save_screenshot(prefix='macos_hunt_target_not_found')
+                return self.round_fail('双向扫描未找到配置Boss，未发送确认')
+        self._scan_previous = signature
+        self.ctx.controller.btn_tap(f'dpad_{self._scan_direction}')
+        return self.round_retry('等待屏外恶名目标出现', wait=0.6)
 
     @operation_node(name='打开恶名列表', is_start_node=True)
     def open_list(self) -> OperationRoundResult:
@@ -119,7 +142,7 @@ class GamepadHuntTransport(GamepadOperation):
         return self.round_by_op_result(GamepadOpenNotoriousHunt(self.ctx).execute())
 
     @node_from(from_name='打开恶名列表')
-    @operation_node(name='选择配置目标', node_max_retry_times=20, timeout_seconds=30)
+    @operation_node(name='选择配置目标', node_max_retry_times=60, timeout_seconds=70)
     def select_target(self) -> OperationRoundResult:
         """以目标文字和整行焦点选择，未找到目标时不进入其他副本。"""
         nav = self.navigation
@@ -134,6 +157,9 @@ class GamepadHuntTransport(GamepadOperation):
         target = nav._text_rect(words, self.target)
         cycle = nav._text_rect(words, '周期挑战')
         if cycle is not None and has_filled_highlight(image, cycle, 'yellow'):
+            self._scan_direction = 'down'
+            self._scan_previous = None
+            self._scan_stuck = 0
             self.ctx.controller.btn_tap('dpad_down')
             self._entered = True
             return self.round_retry('从周期奖励移至副本列表', wait=0.5)
@@ -162,6 +188,13 @@ class GamepadHuntTransport(GamepadOperation):
                 'dpad_down' if frames[0].center.y < target.center.y else 'dpad_up'
             )
             return self.round_retry('等待目标焦点', wait=0.5)
+        if target is None and (len(selected_buttons) == 1 or len(frames) == 1):
+            category = self.ctx.compendium_service.get_category_data('训练', '恶名狩猎')
+            known_names = {name for item in category.mission_type_list for name in (item.mission_type_name, *item.alias_list)}
+            visible_names = tuple(sorted(name for name in known_names if nav._text_rect(words, name) is not None))
+            if visible_names:
+                focus = selected_buttons[0] if selected_buttons else frames[0]
+                return self._scroll_missing_target(focus.center.y, visible_names)
         if not frames and not self._entered:
             self.ctx.controller.btn_tap('south')
             self._entered = True
@@ -657,9 +690,10 @@ class GamepadHuntResultExit(GamepadOperation):
 class GamepadNotoriousHunt(GamepadOperation):
     """单场准备、移动、原自动战斗和结算连续执行。"""
 
-    def __init__(self, ctx: ZContext, plan: ChargePlanItem) -> None:
-        super().__init__(ctx, op_name='手柄恶名狩猎完整单场', timeout_seconds=800)
+    def __init__(self, ctx: ZContext, plan: ChargePlanItem, unrewarded: bool = False) -> None:
+        super().__init__(ctx, op_name='手柄恶名狩猎完整单场', timeout_seconds=1100)
         self.plan: ChargePlanItem = plan
+        self.unrewarded: bool = unrewarded
         self._before: int | None = None
         self._won: bool = False
 
@@ -667,10 +701,10 @@ class GamepadNotoriousHunt(GamepadOperation):
     def prepare(self) -> OperationRoundResult:
         """在出战前加载距离模型，避免战斗计时期间下载。"""
         self.ctx.lost_void.init_lost_void_det_model()
-        op = GamepadHuntPrepare(self.ctx, self.plan)
+        op = GamepadHuntPrepare(self.ctx, self.plan, unrewarded=self.unrewarded)
         result = op.execute()
         self._before = op.left_times
-        if self._before == 0:
+        if self._before == 0 and not self.unrewarded:
             from zzz_od.application.notorious_hunt import notorious_hunt_const
 
             record = self.ctx.run_context.get_run_record(
@@ -707,13 +741,17 @@ class GamepadNotoriousHunt(GamepadOperation):
     @node_from(from_name='战斗')
     @operation_node(name='结算返回', screenshot_before_round=False)
     def finish(self) -> OperationRoundResult:
-        """成功和次数变化一致才更新原应用记录与计划。"""
+        """免费模式核对扣次才更新计划，无报酬模式只核对零次数。"""
         result = GamepadHuntResultExit(self.ctx).execute()
         if not result.success:
             return self.round_by_op_result(result)
         if not self._won or result.data['won'] is not True:
             return self.round_fail('恶名狩猎失败，已返回入口，未增加完成次数')
         left = result.data['left_times']
+        if self.unrewarded:
+            if self._before != 0 or left != 0:
+                return self.round_fail('无报酬挑战次数状态不符，未更新计划')
+            return self.round_success('恶名狩猎无报酬单场完成', data={'left_times': 0, 'won': True, 'unrewarded': True})
         if self._before is None or left != self._before - 1:
             return self.round_fail('胜利后免费次数变化不符，未更新计划')
         from one_dragon.base.operation.application import application_const
