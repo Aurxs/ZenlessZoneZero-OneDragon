@@ -31,12 +31,14 @@ if TYPE_CHECKING:
 
 
 def validate_macos_hunt_plan(plans: list[ChargePlanItem]) -> str | None:
-    """只开放已完整验证的入口，不替换用户选择的目标。"""
+    """保留原计划选择，具体Boss由传送层按原副本数据核对。"""
     if not plans:
         return '请先在恶名狩猎设置中添加计划'
     for plan in plans:
-        if plan.category_name != '恶名狩猎' or plan.mission_type_name != '库萨里库':
-            return 'Mac 免费恶名计划当前仅开放库萨里库；其他 Boss 的免费奖励链待验证'
+        if plan.category_name != '恶名狩猎':
+            return '恶名狩猎计划的分类不正确'
+        if not plan.mission_type_name:
+            return '请先选择恶名狩猎Boss'
         if plan.predefined_team_idx not in range(-1, 20):
             return 'Mac 暂支持当前编队或二十个预备编队'
         if plan.plan_times <= 0 or plan.run_times < 0:
