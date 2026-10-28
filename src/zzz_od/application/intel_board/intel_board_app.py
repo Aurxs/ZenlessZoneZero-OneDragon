@@ -55,6 +55,7 @@ class IntelBoardApp(GamepadMenuDelayMixin, ZApplication):
 
     def handle_init(self) -> None:
         """新运行重新筛选，不把上一次界面状态带入本次。"""
+        ZApplication.handle_init(self)
         if sys.platform == 'darwin':
             self.has_filtered = False
             self.current_commission_type = None

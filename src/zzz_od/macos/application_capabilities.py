@@ -41,13 +41,14 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     'dodge_assistant',
     'suibian_temple',
     'predefined_team_checker',
+    'intel_board',
 })
 
 
 def get_macos_app_limits(app_id: str) -> str:
     """让每个任务显示自身范围，避免商店按钮误显示战斗限制。"""
     return {
-        'intel_board': 'Mac 手柄流程开发检查点：专业挑战和库萨里库单场已验，冥宁芙·双子当前队伍失败；完整周期及预备编队待验，暂未开放运行',
+        'intel_board': 'Mac 支持恶名狩猎和专业挑战室的零电量战斗代行，不接剧情；第一队叶瞬光完整周期1000及返回已验，其他队伍沿原成员核对与战斗策略',
         'auto_battle': 'Mac 原生手柄独立助手：沿原策略等待战斗，支持暂停、恢复、停止及释放；从大世界、手柄战斗或战况菜单启动',
         'dodge_assistant': 'Mac 原生手柄闪避助手：沿原策略等待战斗，支持暂停、恢复、停止及释放；不在菜单继续输出',
         'suibian_temple': 'Mac 支持已完成自动托管的领取与续开；进行中的托管保留至完成。手动游历、饮茶仙、制造、售卖及购买尚未适配，启用时会明确停止',
@@ -69,8 +70,6 @@ def get_macos_app_unavailable_reason(app_id: str) -> str | None:
     """只限制 Mac 运行，不更改应用注册、顺序与启用状态。"""
     if sys.platform != 'darwin' or app_id in MACOS_SUPPORTED_APP_IDS:
         return None
-    if app_id == 'intel_board':
-        return 'Mac情报板周期验收待队伍条件，暂未开放运行'
     return 'Mac暂未适配，此应用仍可查看和配置'
 
 
