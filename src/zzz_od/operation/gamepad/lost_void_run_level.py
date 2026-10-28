@@ -368,6 +368,9 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
             )
 
             result = GamepadLostVoidLottery(self.ctx).execute()
+            # 与原流程一致：抽奖机也可能被模型识别为商店，完成后本层不再追踪。
+            if result.success and '邦布商店' not in self.had_been_list:
+                self.had_been_list.append('邦布商店')
             return self.round_wait('抽奖机已返回', wait=1) if result.success else self.round_by_op_result(result)
         if self.round_by_find_area(self.last_screenshot,'迷失之地-挑战结果','标题-挑战结果').is_success:
             from zzz_od.operation.gamepad.lost_void_result import (
@@ -400,6 +403,9 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
 
             result=GamepadLostVoidBangbooStore(self.ctx).execute()
             if result.success:
+                # 商店 NPC 的图标会保留，沿用原流程的本层忽略列表避免反复走回。
+                if '邦布商店' not in self.had_been_list:
+                    self.had_been_list.append('邦布商店')
                 return self.round_wait(result.status,wait=1)
             return self.round_by_op_result(result)
         from zzz_od.operation.gamepad.lost_void_common import (
