@@ -55,7 +55,7 @@ def get_macos_app_limits(app_id: str) -> str:
         'predefined_team_checker': 'Mac 与 Windows 一致：按游戏槽位自动同步识别到的队名和成员，保留原战斗策略；没有识别到成员的卡片跳过',
         'daily_signin': 'Mac 支持阿朔占卜；刮刮卡和吼吼饼铺尚未适配',
         'mouse_sensitivity_checker': 'Mac 在迷失之地入口层用唯一交互图标双向校准右摇杆，保存到当前账户；不修改 Windows 鼠标参数',
-        'lost_void': 'Mac 战线肃清悬赏任务：活性维持或0至12、原预备编队、金币商店、实际8000进度和领奖；0活性、编队1整链及领奖已验收，其他活性待实测；其他模式及血量购买尚未适配',
+        'lost_void': 'Mac 战线肃清：活性维持或0至12、原预备编队、金币商店与实际悬赏领奖；0活性首次悬赏整链、7活性第一队完整通关已验，其他副本模式及血量购买尚未适配',
         'notorious_hunt': 'Mac 支持自由选择原副本数据中的Boss及原难度、鸣徽、编队；库萨里库免费周期、双子和未知无报酬已实测，按实际次数与结果更新计划',
         'ridu_weekly': 'Mac 支持领取已完成九宫格积分与积分特赏，不代做周任务',
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,
