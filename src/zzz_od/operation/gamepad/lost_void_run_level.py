@@ -26,6 +26,7 @@ from zzz_od.application.hollow_zero.lost_void.operation.lost_void_move_by_det im
 from zzz_od.application.hollow_zero.lost_void.operation.lost_void_run_level import (
     LostVoidRunLevel,
 )
+from zzz_od.operation.gamepad.dialog import GamepadChooseDialogOption
 from zzz_od.operation.gamepad.focus import has_filled_highlight
 from zzz_od.operation.gamepad.gamepad_operation import (
     GamepadMenuDelayMixin,
@@ -42,6 +43,15 @@ if TYPE_CHECKING:
     from one_dragon.base.operation.operation_base import OperationResult
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.context.zzz_context import ZContext
+
+
+class GamepadLostVoidChooseDialogOption(GamepadChooseDialogOption):
+    """局内动态选项仅忽略OCR不稳定的末尾句点，正文及唯一焦点仍完整匹配。"""
+
+    @staticmethod
+    def _normalized(text: str) -> str:
+        """不改通用任务对话的匹配规则，不删除正文中的标点或数字。"""
+        return GamepadChooseDialogOption._normalized(text).rstrip('.．。…')
 
 
 class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
@@ -75,6 +85,8 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         self._dialog_sent_at: float = 0
         self._dialog_text: str | None = None
         self._dialog_repeats: int = 0
+        self._battle_idle_since: float = 0
+        self._battle_idle_action_time: float = 0
 
     def _sidestep_by_dx(self, dx: float) -> None:
         """入口用已校准镜头纠偏，下一次前进朝向目标，避免纯横移反复换焦点。"""
@@ -209,6 +221,7 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         """策略停下后才开放菜单输入，避免迟到攻击落在选择页。"""
         self.ctx.auto_battle_context.stop_auto_battle()
         self._battle_active = False
+        self._battle_idle_since = 0
         self._unknown_hud_since = 0
         self._recovering_battle_frame = False
         self._battle_interact_frames = 0
@@ -262,8 +275,6 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
                     if text.strip() and text.strip() != 'A' and matches.max is not None and matches.max.x >= 100]
             focused = [match for _, match in rows if has_filled_highlight(choices[0], match.rect, 'yellow')]
             if rows and len(focused) == 1:
-                from zzz_od.operation.gamepad.dialog import GamepadChooseDialogOption
-
                 # 鸣徽卡片的黄色数量也可能落入选项带，同行左侧 A 才能证明是对话焦点。
                 prompts = [matches.max for text, matches in choices[1].items()
                            if text.strip() == 'A' and matches.max is not None]
@@ -277,7 +288,7 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
                     return None
                 rows.sort(key=lambda item: item[1].center.y)
                 target = rows[self.talk_opt_idx % len(rows)][0]
-                result = GamepadChooseDialogOption(self.ctx, target, prompt_threshold=0.8).execute()
+                result = GamepadLostVoidChooseDialogOption(self.ctx, target, prompt_threshold=0.8).execute()
                 if result.success:
                     self.talk_opt_idx += 1
                     return self.round_wait('已选择局内对话选项', wait=0.8)
@@ -576,7 +587,35 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         result = super().in_battle()
         if result.is_success or result.is_fail:
             self._stop_battle(resume_menu=result.is_success)
+        elif self.current_frame_in_battle:
+            self._recover_idle_battle()
         return result
+
+    def _recover_idle_battle(self) -> None:
+        """无新策略动作八秒才短幅寻找视野外目标，正常出招与已配置周期转向不受影响。"""
+        battle = self.ctx.auto_battle_context
+        auto_op = battle.auto_op
+        now = time.time()
+        if (not self._battle_active or not self.ctx.run_context.is_context_running
+                or self.ctx.controller.battle_input_blocked or auto_op is None or not auto_op.is_running
+                or auto_op.auto_turn_interval > 0 or self.ctx.macos_config.turn_distance_per_second <= 0
+                or now - self.last_screenshot_time > 1
+                or not battle.is_normal_attack_btn_available(self.last_screenshot)):
+            self._battle_idle_since = 0
+            return
+        executor = auto_op.running_executor
+        last_action = max(auto_op.last_trigger_time.values(), default=0)
+        if (executor is not None and executor.running) or last_action != self._battle_idle_action_time:
+            self._battle_idle_action_time = last_action
+            self._battle_idle_since = now
+            return
+        if self._battle_idle_since == 0:
+            self._battle_idle_since = now
+        elif now - self._battle_idle_since >= 8:
+            # 与原周期转向共用校准控制器，恢复只转镜头，不移动或追加攻击。
+            self.ctx.controller.turn_by_distance(300)
+            self._battle_idle_since = now
+            log.info('迷失之地战斗策略八秒无新动作，按已有校准转向寻找目标')
 
     @node_from(from_name='非战斗画面识别', success=False, status=Operation.STATUS_TIMEOUT)
     @node_from(from_name='战斗中', success=False, status=Operation.STATUS_TIMEOUT)
