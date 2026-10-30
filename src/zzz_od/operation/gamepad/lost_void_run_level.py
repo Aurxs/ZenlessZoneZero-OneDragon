@@ -19,6 +19,7 @@ from zzz_od.application.hollow_zero.lost_void.lost_void_challenge_config import 
 )
 from zzz_od.application.hollow_zero.lost_void.operation.interact.lost_void_interact_target_const import (
     LostVoidInteractTarget,
+    match_interact_target,
 )
 from zzz_od.application.hollow_zero.lost_void.operation.lost_void_move_by_det import (
     LostVoidMoveByDet,
@@ -117,11 +118,34 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
                 return self.round_fail('同一交互三次未响应，已停止')
         else:
             self._interact_attempts = 0
-        result = super().try_interact()
+        result = self._try_entry_button() if not self.interact_attempted else None
+        if result is None:
+            result = super().try_interact()
         if self.interact_attempted:
             self._interact_sent_at = now
             self._interact_attempts += 1
         return result
+
+    def _try_entry_button(self) -> OperationRoundResult | None:
+        """已锁定入口且交互按钮就绪时直接进入，明确的NPC文字仍交原分支。"""
+        target = self.interact_target
+        if (self.region_type != LostVoidRegionType.ENTRY or target is None or not target.is_entry
+                or self.last_screenshot is None
+                or not self.ctx.lost_void.in_normal_world(self.last_screenshot)
+                or not self.round_by_find_area(self.last_screenshot, '战斗画面', '按键-交互').is_success):
+            return None
+        area = self.ctx.screen_loader.get_area('迷失之地-大世界', '区域-交互文本')
+        words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+        for text in words:
+            recognized = match_interact_target(self.ctx, text)
+            if recognized is not None and not recognized.is_entry:
+                return None
+        self.ctx.controller.stop_moving_forward()
+        self.save_screenshot(prefix='macos_lost_void_entry_button_ready')
+        self.locked_interact_target = target
+        self.ctx.controller.interact(press=True, press_time=0.2, release=True)
+        self.interact_attempted = True
+        return self.round_wait('已按就绪的入口交互按钮进入', wait=0.5)
 
     def _try_challenge_dialog(self) -> OperationRoundResult | None:
         """只有挑战类型、黄色确认和A选择共同成立才启动挑战。"""
