@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+import cv2
+
 from one_dragon.base.operation.operation_node import operation_node
 from zzz_od.application.hollow_zero.lost_void.lost_void_challenge_config import (
     LostVoidRegionType,
@@ -18,6 +20,9 @@ from zzz_od.operation.gamepad.transport_by_compendium import (
 )
 
 if TYPE_CHECKING:
+    from cv2.typing import MatLike
+
+    from one_dragon.base.matcher.match_result import MatchResultList
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.context.zzz_context import ZContext
 
@@ -73,15 +78,13 @@ class GamepadLostVoidBattleResult(GamepadOperation):
         )
         if actions is None:
             return self.round_retry('等待结果底栏', wait=1)
-        if all(nav._text_rect(actions[1], word) is not None for word in ('A', '确定')):
+        if self._has_result_action(actions, 'A', '确定'):
             if not won:
                 return self._wait_victory_evidence()
             key = 'south'
             self._status = LostVoidRunLevel.STATUS_NEXT_LEVEL
             self._next_region = LostVoidRegionType.FRIENDLY_TALK.value.value
-        elif all(
-            nav._text_rect(actions[1], word) is not None for word in ('B', '完成')
-        ):
+        elif self._has_result_action(actions, 'B', '完成'):
             if not won:
                 gain = nav._read_area('迷失之地-挑战结果', '手柄-最终结晶')
                 values = (
@@ -112,6 +115,29 @@ class GamepadLostVoidBattleResult(GamepadOperation):
         self.ctx.controller.btn_tap(key)
         self._sent = True
         return self.round_retry('等待挑战结果确认生效', wait=1)
+
+    def _has_result_action(
+        self, actions: tuple[MatLike, dict[str, MatchResultList]], icon: str, label: str,
+    ) -> bool:
+        """底栏小字母漏检时，放大同行文字左侧提示再识别，仍要求实际按键字母。"""
+        target = self.navigation._text_rect(actions[1], label)
+        if target is None:
+            return False
+        if any(text.replace(' ', '') == f'{icon}{label}' and matches.max is not None
+               for text, matches in actions[1].items()):
+            return True
+        prompt = self.navigation._text_rect(actions[1], icon)
+        if (prompt is not None and prompt.x2 <= target.x1
+                and abs(prompt.center.y - target.center.y) < 35):
+            return True
+        image = actions[0]
+        crop = image[max(0, target.y1 - 14):min(image.shape[0], target.y2 + 14),
+                     max(0, target.x1 - 170):max(0, target.x1 - 4)]
+        if not crop.size:
+            return False
+        enlarged = cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+        return any(text.strip().upper() == icon and matches.max is not None
+                   for text, matches in self.ctx.ocr.run_ocr(enlarged).items())
 
     def _wait_victory_evidence(self) -> OperationRoundResult:
         """中途须完成关卡，最终须调查完成或S评级及实际结晶增量。"""
