@@ -110,6 +110,12 @@ def context_memory_details(ctx: ZContext) -> dict[str, object]:
         'screenshot_history_bytes': _image_bytes([item.image for item in history]),
         'auto_op_cache_count': len(battle._op_cache),
         'python_threads': threading.active_count(),
+        'run_event_listener_count': sum(len(items) for items in list(
+            getattr(getattr(run, 'event_bus', None), 'callbacks', {}).values(),
+        )),
+        'context_event_listener_count': sum(len(items) for items in list(
+            getattr(ctx, 'callbacks', {}).values(),
+        )),
     }
     models = {'lost_void': detector, 'flash': flash}
     sessions = {}
