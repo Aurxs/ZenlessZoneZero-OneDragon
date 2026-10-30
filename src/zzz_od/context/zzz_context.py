@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from functools import cached_property
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.one_dragon_context import OneDragonContext
@@ -10,6 +11,7 @@ if TYPE_CHECKING:
     from zzz_od.config.macos_config import MacOsConfig
     from zzz_od.macos.game_session_preparation import MacGameSessionPreparation
     from zzz_od.macos.manual_gamepad import ManualGamepadSession
+    from zzz_od.macos.memory_monitor import MacMemoryMonitor
 
 
 class ZContext(OneDragonContext):
@@ -29,6 +31,7 @@ class ZContext(OneDragonContext):
         # 后续所有用到自动战斗的 都统一设置到这个里面
         from zzz_od.auto_battle.auto_battle_context import AutoBattleContext
         self.auto_battle_context: AutoBattleContext = AutoBattleContext(self)
+        self._memory_monitor: MacMemoryMonitor | None = None
 
     def init(self) -> None:
         """Mac 先要求明确的平台配置，再开始模型下载与服务初始化。"""
@@ -39,6 +42,23 @@ class ZContext(OneDragonContext):
             self.ready_for_application = False
             self.initialization_error = '请在账户管理中将游戏平台设为 macOS PlayCover，然后重新启动一条龙'
             return
+        if sys.platform == 'darwin' and self._memory_monitor is None:
+            from one_dragon.utils import os_utils
+            from zzz_od.macos.memory_monitor import (
+                MacMemoryMonitor,
+                context_memory_details,
+            )
+
+            try:
+                self._memory_monitor = MacMemoryMonitor(
+                    Path(os_utils.get_path_under_work_dir('.log', 'memory')),
+                    lambda: context_memory_details(self),
+                )
+                self._memory_monitor.start()
+            except Exception:
+                from one_dragon.utils.log_utils import log
+
+                log.warning('Mac 内存监测未启动，继续原任务', exc_info=True)
         super().init()
 
     def get_application_unavailable_reason(self, app_id: str) -> str | None:
@@ -257,6 +277,8 @@ class ZContext(OneDragonContext):
         """
         App关闭后进行的操作 关闭一切可能资源操作
         """
+        if self._memory_monitor is not None:
+            self._memory_monitor.stop()
         if 'manual_gamepad' in self.__dict__:
             self.manual_gamepad.stop()
         if hasattr(self, 'telemetry') and self.telemetry:
