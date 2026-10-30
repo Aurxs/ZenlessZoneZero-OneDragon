@@ -192,6 +192,9 @@ class MacBootstrapGameSession(Operation):
 
     def _prepare_from_screen(self) -> OperationRoundResult:
         """按正面证据选择手柄登录、触屏设置和返回路径。"""
+        interrupted = self._prepare_interrupted_challenge()
+        if interrupted is not None:
+            return interrupted
         if self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册',
         ).is_success:
@@ -246,6 +249,23 @@ class MacBootstrapGameSession(Operation):
             return self._send_action('打开触屏设置', area_name='菜单-设置')
 
         return self._wait_for_known_screen()
+
+    def _prepare_interrupted_challenge(self) -> OperationRoundResult | None:
+        """与原登录流程一致取消未完成挑战，先核对提示、选项和实际焦点。"""
+        if not self._has_text('登录后-未完成挑战说明', '当前正在处理'):
+            return None
+        buttons = '登录后-未完成挑战按钮'
+        cancel = self._text_rect(buttons, '取消')
+        confirm = self._text_rect(buttons, '确认')
+        if (cancel is None or confirm is None or not self._has_text(buttons, '选择')
+                or not self._area_found('登录后-未完成挑战选择')):
+            return None
+        if has_filled_highlight(self.last_screenshot, cancel, 'yellow'):
+            self.save_screenshot(prefix='macos_interrupted_challenge_cancel')
+            return self._send_action('取消未完成挑战', gamepad_key='south')
+        if not has_filled_highlight(self.last_screenshot, confirm, 'yellow'):
+            return self.round_fail('未完成挑战选项焦点不明确，已停止')
+        return self._send_action('选择取消未完成挑战', gamepad_key='dpad_left')
 
     def _prepare_login_event(self) -> OperationRoundResult | None:
         """可选全新放送先领再退；A、A、B 各自只在对应画面发送一次。"""
