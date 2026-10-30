@@ -273,10 +273,10 @@ class Operation(OperationBase):
                 edge_desc_list.append(edge)
 
         for edge_desc in edge_desc_list:
-            node_from = node_name_map.get(edge_desc.node_from_name, None)
+            node_from = node_name_map.get(edge_desc.node_from_name)
             if node_from is None:
                 raise ValueError(f'找不到节点 {edge_desc.node_from_name}')
-            node_to = node_name_map.get(edge_desc.node_to_name, None)
+            node_to = node_name_map.get(edge_desc.node_to_name)
             if node_to is None:
                 raise ValueError(f'找不到节点 {edge_desc.node_to_name}')
 
@@ -423,6 +423,7 @@ class Operation(OperationBase):
         try:
             self._init_before_execute()
         except Exception:
+            self._clear_context_event_listeners()
             log.error('初始化失败', exc_info=True)
             return self.op_fail('初始化失败')
 
@@ -694,13 +695,18 @@ class Operation(OperationBase):
         """
         return f'指令[ {self.op_name} ]'
 
+    def _clear_context_event_listeners(self) -> None:
+        """同时解除运行和业务总线，避免结束的指令及截图被回调长期持有。"""
+        self.ctx.run_context.event_bus.unlisten_all_event(self)
+        self.ctx.unlisten_all_event(self)
+
     def after_operation_done(self, result: OperationResult):
         """处理操作完成后的处理。
 
         Args:
             result: 最终操作结果。
         """
-        self.ctx.unlisten_all_event(self)
+        self._clear_context_event_listeners()
         if result.success:
             log.info('%s 执行成功 返回状态 %s', self.display_name, coalesce_gt(result.status, '成功', model='ui'))
         else:
