@@ -201,7 +201,8 @@ class ZMacController(ControllerBase):
                 )
             deadline = time.monotonic() + 2.0
             while self.window_capture.latest_frame(max_age_seconds=self.macos_config.max_frame_age_seconds) is None:
-                if self.window_capture.last_error or time.monotonic() >= deadline:
+                # 首帧前的空白状态可自行恢复；流已停止或等候到期才终止初始化。
+                if not self.window_capture.diagnostics().running or time.monotonic() >= deadline:
                     raise RuntimeError(self.window_capture.last_error or '尚未采集到有效游戏画面')
                 time.sleep(0.02)
             self.resume_input()
