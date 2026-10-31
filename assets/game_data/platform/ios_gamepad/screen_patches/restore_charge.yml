@@ -1,0 +1,86 @@
+screen_id: restore_charge
+added_areas:
+- area_name: 手柄-恢复标题
+  area_type: none
+  pc_rect:
+  - 830
+  - 340
+  - 1100
+  - 410
+- area_name: 手柄-恢复来源
+  area_type: none
+  pc_rect:
+  - 740
+  - 440
+  - 1180
+  - 650
+- area_name: 手柄-恢复说明
+  area_type: none
+  pc_rect:
+  - 830
+  - 405
+  - 1110
+  - 445
+- area_name: 手柄-快捷标题
+  area_type: none
+  pc_rect:
+  - 580
+  - 285
+  - 760
+  - 355
+- area_name: 手柄-快捷来源
+  area_type: none
+  pc_rect:
+  - 780
+  - 425
+  - 1110
+  - 475
+- area_name: 手柄-兑换数值
+  area_type: none
+  pc_rect:
+  - 900
+  - 601
+  - 1100
+  - 650
+- area_name: 手柄-兑换范围
+  area_type: none
+  pc_rect:
+  - 720
+  - 654
+  - 1210
+  - 712
+- area_name: 手柄-兑换确认
+  area_type: none
+  pc_rect:
+  - 760
+  - 725
+  - 1150
+  - 800
+- area_name: 手柄-兑换提示
+  area_type: none
+  pc_rect:
+  - 800
+  - 825
+  - 1110
+  - 890
+- area_name: 手柄-恢复倒计时
+  area_type: none
+  pc_rect:
+  - 750
+  - 650
+  - 1200
+  - 710
+- area_name: 手柄-兑换最小
+  area_type: none
+  pc_rect:
+  - 720
+  - 654
+  - 785
+  - 712
+- area_name: 手柄-兑换最大
+  area_type: none
+  pc_rect:
+  - 1130
+  - 654
+  - 1210
+  - 712
