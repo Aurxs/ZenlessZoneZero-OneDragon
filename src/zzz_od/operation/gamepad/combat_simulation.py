@@ -84,11 +84,17 @@ class GamepadCombatSimulation(GamepadOperation):
         self._return_to_preset_sent = False
 
     def execute(self) -> OperationResult:
-        """正常、失败和异常退出都停止自动战斗。"""
+        """仅本场复用手柄按钮内圈模板，退出时恢复原范围并停止战斗。"""
+        battle = self.ctx.auto_battle_context
+        previous_variants = battle.normal_attack_template_variants
+        battle.normal_attack_template_variants = (
+            *previous_variants, ('ios_gamepad', 'lost_void_attack_inner'),
+        )
         try:
             return super().execute()
         finally:
             self._stop_battle()
+            battle.normal_attack_template_variants = previous_variants
 
     def _stop_battle(self) -> None:
         """先停策略再结束输入保护，避免迟到的战斗动作获得菜单权限。"""

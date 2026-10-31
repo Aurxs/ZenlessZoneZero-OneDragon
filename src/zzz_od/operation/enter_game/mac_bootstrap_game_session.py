@@ -172,6 +172,11 @@ class MacBootstrapGameSession(Operation):
         if not self._timing_initialized:
             self._initialize_timing()
         if not self.ctx.is_game_window_ready:
+            if (self._startup_wait_until is not None
+                    and self.ctx.controller.gamepad.is_connected
+                    and self.ctx.controller.window_capture.diagnostics().running):
+                # 冷启动切换画面可能短暂无帧；沿用原等待上限，不发送任何输入。
+                return self._wait_for_known_screen()
             return self.round_fail('未连接 Mac 游戏窗口，请先在 PlayCover 中打开游戏')
         if not self.ctx.controller.gamepad.is_connected:
             return self.round_fail('Mac 手柄连接不可用，未执行启动点击')

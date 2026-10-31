@@ -75,3 +75,43 @@ added_areas:
   template_sub_dir: lost_void
   template_id: ios_store_goods_gold
   template_match_threshold: 0.9
+- area_name: 手柄-商品金币高亮-1
+  area_type: template
+  pc_rect:
+  - 170
+  - 732
+  - 562
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold_focused
+  template_match_threshold: 0.9
+- area_name: 手柄-商品金币高亮-2
+  area_type: template
+  pc_rect:
+  - 562
+  - 732
+  - 954
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold_focused
+  template_match_threshold: 0.9
+- area_name: 手柄-商品金币高亮-3
+  area_type: template
+  pc_rect:
+  - 954
+  - 732
+  - 1346
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold_focused
+  template_match_threshold: 0.9
+- area_name: 手柄-商品金币高亮-4
+  area_type: template
+  pc_rect:
+  - 1346
+  - 732
+  - 1738
+  - 784
+  template_sub_dir: lost_void
+  template_id: ios_store_goods_gold_focused
+  template_match_threshold: 0.9

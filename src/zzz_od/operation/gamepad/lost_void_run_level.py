@@ -88,6 +88,8 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         self._dialog_repeats: int = 0
         self._battle_idle_since: float = 0
         self._battle_idle_action_time: float = 0
+        self._battle_no_contact_since: float = 0
+        self._battle_contact_frame_time: float = -1
 
     def _sidestep_by_dx(self, dx: float) -> None:
         """入口用已校准镜头纠偏，下一次前进朝向目标，避免纯横移反复换焦点。"""
@@ -246,6 +248,8 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         self.ctx.auto_battle_context.stop_auto_battle()
         self._battle_active = False
         self._battle_idle_since = 0
+        self._battle_no_contact_since = 0
+        self._battle_contact_frame_time = -1
         self._unknown_hud_since = 0
         self._recovering_battle_frame = False
         self._battle_interact_frames = 0
@@ -260,6 +264,8 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
         """暂停后停止原策略，保留保护范围等待复核。"""
         super().handle_pause()
         self._battle_active = False
+        self._battle_no_contact_since = 0
+        self._battle_contact_frame_time = -1
 
     def handle_resume(self) -> None:
         """只在本场新帧重新命中 HUD 后恢复战斗。"""
@@ -602,18 +608,54 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
                 self._unknown_hud_since = 0
             elif self._unknown_hud_since == 0:
                 self._unknown_hud_since = time.monotonic()
-            elif time.monotonic() - self._unknown_hud_since > 12:
-                self._stop_battle()
-                self.save_screenshot(prefix='macos_lost_void_battle_menu_pending')
-                return self.round_fail('迷失之地战斗后未知画面，已停止输入')
+            else:
+                # 灰暗普攻仍不可操作，只延长已识别状态的等待，不放行战斗输入。
+                dimmed = self.round_by_find_area(self.last_screenshot, '迷失之地-大世界', '手柄-普攻灰暗').is_success
+                timeout = 45 if dimmed else 12
+                if time.monotonic() - self._unknown_hud_since > timeout:
+                    self._stop_battle()
+                    self.save_screenshot(prefix='macos_lost_void_battle_menu_pending')
+                    return self.round_fail('迷失之地战斗后未知画面，已停止输入')
             return self.round_wait(wait=self.ctx.battle_assistant_config.screenshot_interval)
         self._unknown_hud_since = 0
         result = super().in_battle()
         if result.is_success or result.is_fail:
             self._stop_battle(resume_menu=result.is_success)
         elif self.current_frame_in_battle:
+            if self._should_search_after_no_contact():
+                self.save_screenshot(prefix='macos_lost_void_battle_no_contact')
+                self._stop_battle(resume_menu=True)
+                return self.round_success('识别需移动交互')
             self._recover_idle_battle()
         return result
+
+    def _should_search_after_no_contact(self) -> bool:
+        """普通区域三十秒无接敌信号时重新寻路，持续空挥不作为战斗进展。"""
+        battle = self.ctx.auto_battle_context
+        auto_op = battle.auto_op
+        now = time.time()
+        if (self.region_type in (LostVoidRegionType.ELITE, LostVoidRegionType.BOSS)
+                or not self._battle_active or not self.ctx.run_context.is_context_running
+                or self.ctx.controller.battle_input_blocked or auto_op is None or not auto_op.is_running
+                or auto_op.target_lock_interval <= 0 or now - self.last_screenshot_time > 1
+                or not battle.is_normal_attack_btn_available(self.last_screenshot)):
+            self._battle_no_contact_since = 0
+            return False
+        if self.last_screenshot_time <= self._battle_contact_frame_time:
+            return False
+        self._battle_contact_frame_time = self.last_screenshot_time
+        for name in ('目标-近距离锁定', '闪避识别-红光', '闪避识别-黄光',
+                     '前台-血量扣减', '按键可用-连携技'):
+            record = battle.state_record_service.get_state_recorder(name)
+            if record is not None and record.last_record_time > 0 and now - record.last_record_time <= 3:
+                self._battle_no_contact_since = 0
+                return False
+        if self._battle_no_contact_since == 0:
+            self._battle_no_contact_since = now
+        if now - self._battle_no_contact_since < 30:
+            return False
+        log.info('迷失之地普通区域三十秒无锁定、闪光、扣血或连携，停止空挥并重新寻路')
+        return True
 
     def _recover_idle_battle(self) -> None:
         """无新策略动作八秒才短幅寻找视野外目标，正常出招与已配置周期转向不受影响。"""

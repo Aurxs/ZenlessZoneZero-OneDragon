@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.operation_node import operation_node
@@ -42,8 +43,8 @@ class GamepadChooseDialogOption(GamepadOperation):
 
     @staticmethod
     def _normalized(text: str) -> str:
-        """仅移除空白，完整匹配选项，避免模糊命中其他分支。"""
-        return ''.join(text.split())
+        """统一全角半角并移除空白，仍完整匹配，不删词或模糊选分支。"""
+        return ''.join(unicodedata.normalize('NFKC', text).split())
 
     def _save(self, stage: str) -> bool:
         """保存选项前后及未知状态，操作前无法留图时不确认。"""
