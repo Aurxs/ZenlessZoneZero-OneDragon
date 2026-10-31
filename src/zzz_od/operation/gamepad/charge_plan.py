@@ -60,7 +60,12 @@ if TYPE_CHECKING:
 def validate_macos_charge_plan(config: ChargePlanConfig) -> str | None:
     """检查所有保存的计划，不把未支持的任务替换成调查专项。"""
     if config.restore_charge != RestoreChargeEnum.NONE.value.value:
-        return 'Mac 体力计划尚不支持恢复电量，请将恢复电量设置为不使用'
+        from zzz_od.operation.gamepad.restore_reserve_charge import reserve_budget
+
+        try:
+            reserve_budget(config)
+        except (ValueError, TypeError) as error:
+            return f'Mac储蓄恢复未获有效日期及额度许可：{error}'
     plans = list(config.plan_list)
     if config.double_reward:
         try:
@@ -167,6 +172,7 @@ class GamepadChargePlan(GamepadOperation):
             },
         )
 
+    @node_from(from_name='执行最小储蓄补电')
     @node_from(from_name='执行电池合成')
     @node_from(from_name='检查双倍活动')
     @node_from(from_name='跳过本轮培养目标')
@@ -328,8 +334,22 @@ class GamepadChargePlan(GamepadOperation):
         self.current_charge = current
         self.run_record.record_current_charge_power(current)
         if current < required:
+            if self.config.restore_charge == RestoreChargeEnum.BACKUP_ONLY.value.value:
+                if self.current_plan is None or self.current_plan.category_name != '区域巡防':
+                    return self.round_fail('最小储蓄补电仅支持已核对的普通巡防')
+                return self.round_success('执行最小储蓄补电')
             return self.round_success(self.STATUS_CHARGE_NOT_ENOUGH)
         return self.round_success()
+
+    @node_from(from_name='核对单次实际电量', status='执行最小储蓄补电')
+    @operation_node(name='执行最小储蓄补电', screenshot_before_round=False, timeout_seconds=260)
+    def restore_minimum_reserve(self) -> OperationRoundResult:
+        """补电和独立对账后重新从原计划选取，绝不增加胜利次数。"""
+        from zzz_od.operation.gamepad.restore_reserve_charge import (
+            GamepadRestoreReserveCharge,
+        )
+
+        return self.round_by_op_result(GamepadRestoreReserveCharge(self.ctx, self.config).execute())
 
     @node_from(from_name='核对单次实际电量')
     @operation_node(name='执行单次挑战')
