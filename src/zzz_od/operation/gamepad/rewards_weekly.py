@@ -35,6 +35,7 @@ class GamepadRiduWeekly(_GamepadRewardOperation):
         self._pending_waits: int = 0
         self._claimed_tasks: list[int] = []
         self._navigation_steps: int = 0
+        self._post_claim_unknown_waits: int = 0
 
     def handle_init(self) -> None:
         """每次运行重新读取任务和可领取提示，不沿用旧帧判断。"""
@@ -48,6 +49,7 @@ class GamepadRiduWeekly(_GamepadRewardOperation):
         self._pending_waits = 0
         self._claimed_tasks = []
         self._navigation_steps = 0
+        self._post_claim_unknown_waits = 0
 
     def focused_task(self) -> int | None:
         """从九宫格黄色外框取行列，不把任务名或变化的积分当焦点。"""
@@ -186,7 +188,13 @@ class GamepadRiduWeekly(_GamepadRewardOperation):
             self._pending_task = target
             return self.round_retry('等待周纪积分领取完成', wait=1)
         if unknown:
+            # 已确认本次领取后，连线动画会暂时隐藏其他格的 BINGO 文字。
+            # 只被动等待六帧；初始未知或持续未知仍保留现场，不发领取键。
+            if self._claimed_tasks and self._post_claim_unknown_waits < 6:
+                self._post_claim_unknown_waits += 1
+                return self.round_retry('等待周纪连线标记稳定', wait=0.8)
             return self._pending_evidence('weekly_unknown_tasks', f'周纪第 {unknown} 格状态未知')
+        self._post_claim_unknown_waits = 0
         return self.round_success()
 
     @node_from(from_name='检查周纪任务积分')
