@@ -1,0 +1,8 @@
+sub_dir: lost_void
+template_id: ios_store_goods_gold_focused
+template_name: iOS邦布商店高亮商品金币
+template_shape: circle
+auto_mask: true
+point_list:
+- 721, 758
+- 735, 758

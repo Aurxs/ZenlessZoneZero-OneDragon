@@ -12,7 +12,8 @@ dependencies = [
     "pyautogui==0.9.54",
     "pynput==1.8.1",
     "onnxruntime-directml==1.24.4; sys_platform == 'win32'",
-    "onnxruntime==1.24.4; sys_platform == 'darwin'",
+    # 1.24.4 的 SME 卷积按输入内容缓存，动态画面会持续增长；1.27 已含上游 #28363 修复。
+    "onnxruntime==1.27.0; sys_platform == 'darwin'",
     "pyobjc-framework-ScreenCaptureKit==12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-Quartz==12.2.2; sys_platform == 'darwin'",
     "pyobjc-framework-libdispatch==12.2.2; sys_platform == 'darwin'",

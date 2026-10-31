@@ -29,6 +29,7 @@ class GamepadCityFund(_GamepadRewardOperation):
         super().__init__(ctx, op_name='手柄丽都城募奖励', timeout_seconds=150)
         self._menu_opened: bool = False
         self._entered: bool = False
+        self._intro_open_sent: bool = False
         self._task_scan_index: int = 0
         self._task_counts: dict[str, int] = {}
         self._claim_categories: list[str] = []
@@ -46,6 +47,7 @@ class GamepadCityFund(_GamepadRewardOperation):
         self.evidence_paths.clear()
         self._menu_opened = False
         self._entered = False
+        self._intro_open_sent = False
         self._task_scan_index = 0
         self._task_counts.clear()
         self._claim_categories.clear()
@@ -89,6 +91,14 @@ class GamepadCityFund(_GamepadRewardOperation):
         return area is not None and all(
             self._text_rect(area[1], text) is not None for text in ('代理人', '商城', '丽都城募')
         )
+
+    def _intro_open_visible(self) -> bool:
+        """只接受介绍页已观察的三组提示，价格或其他按钮不推断为免费入口。"""
+        area = self._read_area('丽都城募', '手柄-底部提示')
+        if area is None:
+            return False
+        words = {''.join(text.split()) for text in area[1]}
+        return words == {'RS', '奖励详情', '开启丽都城募'}
 
     def _select_main_tab(self, target: str) -> OperationRoundResult:
         """主标签每次只走一格，并从下一帧重新确认高亮。"""
@@ -149,6 +159,14 @@ class GamepadCityFund(_GamepadRewardOperation):
             return self.round_success()
         if self._known_reward_visible():
             return self._pending_evidence('city_unrelated_reward', '未确认已有获得弹窗属于本次城募领取')
+        if self._intro_open_visible():
+            if not self._intro_open_sent:
+                if not self._save_evidence('city_intro_before'):
+                    return self.round_fail('城募介绍页开启前截图保存失败')
+                self.ctx.controller.btn_tap('start')
+                self._intro_open_sent = True
+                self._entered = True
+            return self.round_retry('已开启城募介绍页，等待原奖励页面', wait=0.8)
         if self._menu_visible():
             if self._entered:
                 return self.round_retry('等待丽都城募页面', wait=0.8)

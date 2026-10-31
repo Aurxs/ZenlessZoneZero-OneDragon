@@ -27,11 +27,13 @@ class GamepadLostVoidUpdatePriority(GamepadMenuDelayMixin, UpdatePriorityOperati
         super().__init__(ctx)
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(ctx, '作战', '周期征讨')
         self._opened: bool = False
+        self._open_attempts: int = 0
+        self._open_frame_time: float = -1
         self._closed: bool = False
 
     @operation_node(name='进入藏品页面', is_start_node=True, node_max_retry_times=8)
     def enter_collections(self) -> OperationRoundResult:
-        """按完整页签填充识别肩键方向，只从已确认局内打开一次。"""
+        """按完整页签识别肩键方向，局内新帧确认首按未生效时仅补一次。"""
         if self.last_screenshot is None:
             return self.round_retry('等待藏品菜单截图', wait=1)
         nav = self.navigation
@@ -45,9 +47,15 @@ class GamepadLostVoidUpdatePriority(GamepadMenuDelayMixin, UpdatePriorityOperati
             if len(current) == 1:
                 self.ctx.controller.btn_tap('right_shoulder' if current[0] == '地图' else 'left_shoulder')
                 return self.round_retry('等待藏品页签', wait=1)
-        if not self._opened and self.ctx.lost_void.in_normal_world(self.last_screenshot):
+        if (self.ctx.lost_void.in_normal_world(self.last_screenshot)
+                and (not self._opened or (self._open_attempts < 2
+                     and self.last_screenshot_time - self._open_frame_time >= 3))):
+            if self._opened:
+                self.save_screenshot(prefix='macos_lost_void_priority_open_retry')
             self.ctx.controller.click(gamepad_key='minimap')
             self._opened = True
+            self._open_attempts += 1
+            self._open_frame_time = self.last_screenshot_time
         return self.round_retry('等待局内菜单', wait=1)
 
     @node_from(from_name='识别并存储优先级')

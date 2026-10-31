@@ -182,12 +182,12 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         ]
 
     def _currency_flags(self) -> tuple[bool, bool]:
-        """刷新费用消失时只认商品金币，不用钱包图标代替商品支付方式。"""
+        """刷新费用消失时识别商品金币及高亮背景，不用钱包图标代替支付方式。"""
         gold = self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', '标识-金币').is_success
         blood = self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', '标识-血量').is_success
         if not gold and not blood:
-            gold = any(self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', f'手柄-商品金币-{idx}').is_success
-                       for idx in range(1, 5))
+            gold = any(self.round_by_find_area(self.last_screenshot, '迷失之地-邦布商店', f'{prefix}-{idx}').is_success
+                       for prefix in ('手柄-商品金币', '手柄-商品金币高亮') for idx in range(1, 5))
         return gold, blood
 
     @staticmethod

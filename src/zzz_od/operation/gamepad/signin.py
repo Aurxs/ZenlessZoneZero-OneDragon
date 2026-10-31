@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, ClassVar
 
+import numpy as np
+
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
 from one_dragon.utils import debug_utils
@@ -168,6 +170,18 @@ class GamepadDailySignIn(GamepadOperation):
             '手柄-结果确认', '手柄-结果解卦', '手柄-娱乐说明',
         ))
 
+    def _result_confirm_ready(self) -> bool:
+        """结果动画时确认文字呈灰色，等待其白色笔画亮起再按 A。"""
+        area = self.ctx.screen_loader.get_area('卦象集录', '手柄-结果确认')
+        if area is None or self.last_screenshot is None:
+            return False
+        rect = area.rect
+        image = self.last_screenshot[rect.y1:rect.y2, rect.x1:rect.x2]
+        if not image.size:
+            return False
+        white = np.all(image >= 200, axis=2)
+        return bool(np.count_nonzero(white) / white.size >= 0.015)
+
     def _result_data(self) -> dict:
         """输出本次实际执行范围，奖励恢复不能充当完整占卜证据。"""
         return {
@@ -256,6 +270,8 @@ class GamepadDailySignIn(GamepadOperation):
             self._unknown_rounds = 0
             self._save_evidence('trigram_result_before')
             if not self._result_confirm_sent:
+                if not self._result_confirm_ready():
+                    return self.round_retry('等待卦象结果确认按钮启用', wait=0.5)
                 self.ctx.controller.btn_tap('south')
                 self._result_confirm_sent = True
             return self.round_retry('等待卦象结果确认结束', wait=0.8)

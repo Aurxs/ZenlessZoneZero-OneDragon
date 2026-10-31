@@ -567,17 +567,16 @@ wheels = [
 
 [[package]]
 name = "onnxruntime"
-version = "1.24.4"
+version = "1.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "flatbuffers", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
     { name = "numpy", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
     { name = "packaging", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
     { name = "protobuf", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
-    { name = "sympy", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/60/69/6c40720201012c6af9aa7d4ecdd620e521bd806dc6269d636fdd5c5aeebe/onnxruntime-1.24.4-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:0bdfce8e9a6497cec584aab407b71bf697dac5e1b7b7974adc50bf7533bdb3a2", size = 17332131, upload-time = "2026-03-17T22:05:49.005Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/e4/5353d7e09ced4a8f473f843223fc75d726b2b5519dcefc12f22a6c92852d/onnxruntime-1.27.0-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:8ba14a38c570087f3cdb8cfba33f7a38a1e826c1e5b29e17c28ceda0cc910016", size = 18416484, upload-time = "2026-06-15T22:43:43.894Z" },
 ]
 
 [[package]]
@@ -3863,7 +3862,7 @@ requires-dist = [
     { name = "gensim", specifier = "==4.4.0" },
     { name = "librosa", specifier = "==0.11.0" },
     { name = "numpy", specifier = "==2.4.6" },
-    { name = "onnxruntime", marker = "sys_platform == 'darwin'", specifier = "==1.24.4" },
+    { name = "onnxruntime", marker = "sys_platform == 'darwin'", specifier = "==1.27.0" },
     { name = "onnxruntime-directml", marker = "sys_platform == 'win32'", specifier = "==1.24.4" },
     { name = "opencv-python", specifier = "==4.13.0.92" },
     { name = "psutil", specifier = "==7.2.2" },
