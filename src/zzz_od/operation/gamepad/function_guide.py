@@ -24,6 +24,7 @@ class GamepadOpenFunction(_GamepadRewardOperation):
         self._scan_signature: tuple[int, int, tuple[str, ...]] | None = None
         self._opened: bool = False
         self._entered: bool = False
+        self._focus_unknown_count: int = 0
 
     def handle_init(self) -> None:
         """重新执行时清理本次输入标记。"""
@@ -32,6 +33,7 @@ class GamepadOpenFunction(_GamepadRewardOperation):
         self._entered = False
         self._scan_count = 0
         self._scan_signature = None
+        self._focus_unknown_count = 0
 
     @operation_node(name='选择功能入口', is_start_node=True, node_max_retry_times=18)
     def select_function(self) -> OperationRoundResult:
@@ -56,7 +58,11 @@ class GamepadOpenFunction(_GamepadRewardOperation):
                     self._scan_count += 1
                 return self.round_retry('等待下方功能卡片显示', wait=0.8)
             if len(frames) != 1 or target is None:
+                self._focus_unknown_count += 1
+                if self._focus_unknown_count <= 5:
+                    return self.round_retry('等待功能卡片动画及唯一焦点，未发送输入', wait=0.8)
                 return self._pending_evidence('function_focus', f'未识别{self.target}或唯一功能焦点')
+            self._focus_unknown_count = 0
             focus = frames[0]
             if focus.x1 <= target.center.x <= focus.x2 and focus.y1 <= target.center.y <= focus.y2:
                 self._save_evidence('function_selected')

@@ -122,7 +122,13 @@ class CoffeeApp(GamepadMenuDelayMixin, ZApplication):
             return False
         texts = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
         normalized = {''.join(text.split()): matches for text, matches in texts.items()}
-        if not all(name in normalized for name in ('获得', '电量', '确认')):
+        if not all(name in normalized for name in ('电量', '确认')):
+            return False
+        title = self.ctx.screen_loader.get_area('道具处理-获得', '标题-获得')
+        if title is None:
+            return False
+        title_words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, title.rect)
+        if not any(''.join(word.split()) == '获得' for word in title_words):
             return False
         confirm = normalized['确认'].max
         rect = area.rect

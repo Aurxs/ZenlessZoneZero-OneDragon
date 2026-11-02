@@ -18,6 +18,8 @@ from zzz_od.operation.gamepad.rewards import _GamepadRewardOperation
 from zzz_od.operation.gamepad.transport import find_yellow_focus_frames
 
 if TYPE_CHECKING:
+    from cv2.typing import MatLike
+
     from one_dragon.base.operation.operation_base import OperationResult
     from one_dragon.base.operation.operation_round_result import OperationRoundResult
     from zzz_od.context.zzz_context import ZContext
@@ -59,6 +61,9 @@ class GamepadIntelBoardFilter(_GamepadRewardOperation):
         self._reset_sent: bool = False
         self._type_index: int = 0
         self._toggle_sent: bool = False
+        self._toggle_sent_at: float = 0
+        self._toggle_attempts: int = 0
+        self._verify_shifted: bool = False
         self._closed: bool = False
 
     def _action_focused(self, name: str) -> bool:
@@ -89,18 +94,40 @@ class GamepadIntelBoardFilter(_GamepadRewardOperation):
             if target is not None and has_filled_highlight(image, target, 'blue'):
                 self._type_index += 1
                 self._toggle_sent = False
+                self._toggle_attempts = 0
+                self._verify_shifted = False
                 return self.round_wait('委托类型已选中', wait=0.5)
-            if self._toggle_sent:
-                return self.round_retry('等待筛选蓝色选中状态', wait=0.5)
             contours, _ = cv2.findContours(highlight_mask(image, 'yellow'), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             frames = [cv2.boundingRect(item) for item in contours
                       if 180 < cv2.boundingRect(item)[2] < 300 and 25 < cv2.boundingRect(item)[3] < 65]
             if len(frames) != 1 or target is None:
+                if self._toggle_sent:
+                    return self.round_retry('等待筛选蓝色选中状态', wait=0.5)
                 return self._pending_evidence('intel_filter_focus', '未确认筛选条件唯一焦点')
             x, y, width, height = frames[0]
-            if x <= target.center.x <= x + width and y <= target.center.y <= y + height:
+            target_focused = x <= target.center.x <= x + width and y <= target.center.y <= y + height
+            if self._toggle_sent and target_focused and not self._verify_shifted:
+                # 焦点描边可能遮住选中填色；先离开目标，再以蓝色状态核对。
+                self.ctx.controller.btn_tap('dpad_right' if self._type_index == 0 else 'dpad_left')
+                self._verify_shifted = True
+                return self.round_wait('移开焦点核对筛选选中状态', wait=0.8)
+            if self._toggle_sent and time.monotonic() - self._toggle_sent_at < 3:
+                return self.round_retry('等待筛选蓝色选中状态', wait=0.5)
+            if target_focused:
+                if self._toggle_attempts >= 2:
+                    first = self._text_rect(words, types[0])
+                    if self._type_index == 1 and first is not None and has_filled_highlight(image, first, 'blue'):
+                        # 保留已确认的零电量战斗筛选；不推断另一类型已选。
+                        self._save_evidence('intel_filter_single_type')
+                        self.ctx.controller.btn_tap('east')
+                        self._closed = True
+                        return self.round_wait('仅恶名狩猎已确认选中，继续该类代行', wait=1)
+                    return self.round_fail('筛选目标两次确认后仍未核对选中')
                 self.ctx.controller.btn_tap('south')
                 self._toggle_sent = True
+                self._verify_shifted = False
+                self._toggle_sent_at = time.monotonic()
+                self._toggle_attempts += 1
             elif target.center.y > y + height:
                 self.ctx.controller.btn_tap('dpad_down')
             elif target.center.y < y:
@@ -375,6 +402,23 @@ class GamepadIntelBattle(GamepadOperation):
             self._active = True
 
 
+def intel_limit_popup_visible(ctx: ZContext, screenshot: MatLike | None) -> bool:
+    """只接受已观察的代行完成、周期上限和黄色确认同时出现。"""
+    if screenshot is None:
+        return False
+    area = ctx.screen_loader.get_area('情报板', '手柄-弹窗')
+    if area is None:
+        return False
+    words = ctx.ocr.crop_and_run_ocr(screenshot, area.rect)
+    text = ''.join(words).replace(' ', '')
+    if not all(word in text for word in ('代行委托完成', '贡献点数', '站点信度', '周期可获取上限')):
+        return False
+    target = _GamepadRewardOperation._text_rect(words, '确认')
+    rect = area.rect
+    image = screenshot[rect.y1:rect.y2, rect.x1:rect.x2]
+    return target is not None and has_filled_highlight(image, target, 'yellow')
+
+
 class GamepadIntelSettlement(_GamepadRewardOperation):
     """关闭真实挑战结果，回到板面后由原应用记录次数。"""
 
@@ -397,6 +441,12 @@ class GamepadIntelSettlement(_GamepadRewardOperation):
                 self.ctx.controller.btn_tap('east')
                 self._detail_back_sent = True
             return self.round_retry('关闭未完成的代行详情', wait=1)
+        if intel_limit_popup_visible(self.ctx, self.last_screenshot):
+            if not self._reward_sent:
+                self._save_evidence('intel_limit_before_confirm')
+                self.ctx.controller.btn_tap('south')
+                self._reward_sent = True
+            return self.round_retry('等待周期上限提示关闭', wait=1)
         popup = self._read_area('情报板', '手柄-代行奖励确认')
         if popup is not None and self.round_by_find_area(
             self.last_screenshot, '情报板', '手柄-代行奖励标题',
