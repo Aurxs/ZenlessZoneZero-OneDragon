@@ -214,6 +214,56 @@ class MacBootstrapGameSession(Operation):
         ):
             return self._send_action('关闭触屏快捷手册', area_name='快捷手册-触屏关闭')
 
+        # 已实测的恶名狩猎挑战入口可在中断后保留；只识别完整页面后复用原返回节点。
+        area = self.ctx.screen_loader.get_area('恶名狩猎', '手柄-页面文字')
+        if area is not None:
+            words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+            text = ''.join(words).replace(' ', '')
+            if all(word in text for word in ('挑战等级', '剩余奖励次数', '周期剩余时间', '相关代理人', '下一步', 'LS')):
+                from zzz_od.operation.gamepad.notorious_hunt import (
+                    GamepadHuntBackToWorld,
+                )
+
+                return self.round_by_op_result(GamepadHuntBackToWorld(self.ctx).execute())
+
+        # 已知手柄功能导览意外中断时，先沿原退出流程回到大世界。
+        if self.round_by_find_area(self.last_screenshot, '功能导览', '标题').is_success:
+            area = self.ctx.screen_loader.get_area('功能导览', '手柄-卡片')
+            if area is not None:
+                words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+                text = ''.join(words).replace(' ', '')
+                if all(word in text for word in ('商城', '仓库', '情报板')):
+                    from zzz_od.operation.gamepad.intel_board import (
+                        GamepadIntelBackToWorld,
+                    )
+
+                    return self.round_by_op_result(GamepadIntelBackToWorld(self.ctx).execute())
+
+        if self.round_by_find_area(self.last_screenshot, '情报板', '手柄-筛选标题').is_success:
+            area = self.ctx.screen_loader.get_area('情报板', '手柄-筛选条件')
+            if area is not None:
+                words = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
+                text = ''.join(words).replace(' ', '')
+                if all(word in text for word in ('恶名狩猎', '专业挑战室')):
+                    from zzz_od.operation.gamepad.intel_board import (
+                        GamepadIntelBackToWorld,
+                    )
+
+                    return self.round_by_op_result(GamepadIntelBackToWorld(self.ctx).execute())
+
+        # 代行完成后周期上限弹窗可能跨进程保留，不能重新出战。
+        from zzz_od.operation.gamepad.intel_board import (
+            GamepadIntelBackToWorld,
+            GamepadIntelSettlement,
+            intel_limit_popup_visible,
+        )
+
+        if intel_limit_popup_visible(self.ctx, self.last_screenshot):
+            settled = GamepadIntelSettlement(self.ctx).execute()
+            if not settled.success:
+                return self.round_by_op_result(settled)
+            return self.round_by_op_result(GamepadIntelBackToWorld(self.ctx).execute())
+
         login_result = self._prepare_login()
         if login_result is not None:
             return login_result

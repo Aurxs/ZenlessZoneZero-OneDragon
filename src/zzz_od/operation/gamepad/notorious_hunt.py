@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import TYPE_CHECKING, ClassVar
 
 from one_dragon.base.operation.operation_edge import node_from
@@ -782,6 +783,8 @@ class GamepadHuntBackToWorld(GamepadOperation):
     def __init__(self, ctx: ZContext) -> None:
         super().__init__(ctx, op_name='手柄恶名狩猎返回街区', timeout_seconds=25)
         self._sent: bool = False
+        self._entry_sent_at: float = 0
+        self._entry_attempts: int = 0
         self._deployment_back_sent: bool = False
         self._list_back_sent: bool = False
 
@@ -806,10 +809,15 @@ class GamepadHuntBackToWorld(GamepadOperation):
             self.ctx.controller.btn_tap('east')
             self._list_back_sent = True
             return self.round_retry('等待离开恶名狩猎列表', wait=1)
-        if not self._sent and '挑战等级' in text and ('剩余奖励次数' in text or '深度追猎' in text):
-            self.ctx.controller.resume_input()
-            self.ctx.controller.btn_tap('east')
-            self._sent = True
+        if '挑战等级' in text and ('剩余奖励次数' in text or '深度追猎' in text):
+            # 结算切换时入口文字可能先于按键就绪；仅同一已识别入口可有限补发。
+            if self._entry_attempts < 2 and (not self._sent or time.monotonic() - self._entry_sent_at >= 3):
+                self.ctx.controller.resume_input()
+                self.ctx.controller.btn_tap('east')
+                self._sent = True
+                self._entry_sent_at = time.monotonic()
+                self._entry_attempts += 1
+                return self.round_retry('已请求离开挑战入口，等待新画面', wait=1)
         return self.round_retry('等待返回街区', wait=1)
 
 
