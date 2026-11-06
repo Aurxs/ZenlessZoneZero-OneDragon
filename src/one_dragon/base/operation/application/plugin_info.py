@@ -39,6 +39,7 @@ class PluginInfo:
         homepage: 项目主页 URL（可选）
         version: 版本号（可选）
         description: 简短描述（可选）
+        cover_path: 封面图路径（可选，相对插件根目录解析后的绝对路径）
         plugin_dir: 插件目录路径
         factory_module: 工厂模块名
         const_module: 常量模块名
@@ -55,11 +56,12 @@ class PluginInfo:
     # 应用入口
     internal_app: bool = False
 
-    # 插件元数据（从 const 获取，可选）
+    # 插件元数据（从插件包内的 plugin.json 获取，可选）
     author: str = ''
     homepage: str = ''
     version: str = ''
     description: str = ''
+    cover_path: Path | None = None
 
     # 插件目录信息
     plugin_dir: Path | None = None
