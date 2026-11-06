@@ -64,13 +64,16 @@ class GamepadLostVoidUpdatePriority(GamepadMenuDelayMixin, UpdatePriorityOperati
         """关闭后必须重新确认局内 HUD。"""
         if self.last_screenshot is None:
             return self.round_retry('等待返回截图', wait=1)
-        if self.ctx.lost_void.in_normal_world(self.last_screenshot):
-            self.ctx.lost_void.priority_updated = True
-            return self.round_success('动态优先级已更新')
         nav = self.navigation
         nav.last_screenshot = self.last_screenshot
         tabs = nav._read_area('迷失之地-藏品面板', '手柄-页签')
-        if tabs and all(nav._text_rect(tabs[1], name) is not None for name in ('地图', '藏品', '属性')) and not self._closed:
-            self.ctx.controller.btn_tap('east')
-            self._closed = True
+        # 菜单可能透出背景 HUD；先确认页签已消失，再接受局内识别。
+        if tabs and all(nav._text_rect(tabs[1], name) is not None for name in ('地图', '藏品', '属性')):
+            if not self._closed:
+                self.ctx.controller.btn_tap('east')
+                self._closed = True
+            return self.round_retry('等待藏品菜单关闭', wait=1)
+        if self.ctx.lost_void.in_normal_world(self.last_screenshot):
+            self.ctx.lost_void.priority_updated = True
+            return self.round_success('动态优先级已更新')
         return self.round_retry('等待藏品菜单关闭', wait=1)
