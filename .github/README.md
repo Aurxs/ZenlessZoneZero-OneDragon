@@ -46,7 +46,7 @@ __ZenlessZoneZero-OneDragon__
 
 ## 🛠️ 部署与使用
 
-- **macOS / Apple Silicon / PlayCover**：从 [Mac 部署教程](../docs/develop/zzz/macos_deployment.md) 开始，依次完成 PlayCover 游戏设置、源码环境、系统权限、手柄组件和首次运行。教程列出了各设置页的配置值与作用；Mac 当前通过源码启动，任务支持范围以界面提示为准。
+- **macOS / Apple Silicon / PlayCover 4.0 Preview**：从 [Mac 部署教程](../docs/develop/zzz/macos_deployment.md) 开始，依次完成 PlayCover 游戏设置、源码环境、系统权限、手柄组件和首次运行。**PlayCover 3.x 不适用此教程。** Mac 当前通过源码启动，任务支持范围以界面提示为准。
 - **Windows**：使用 [官方网站](https://one-dragon.com/) 的新手入门与配置说明；源码开发见 [快速开始](../docs/develop/setup/quickstart.md)。
 
 ## 📸 页面预览

@@ -1,6 +1,6 @@
 # Mac 部署教程（PlayCover 原生手柄）
 
-适用于 Apple Silicon Mac，通过 PlayCover 运行 iOS 版《绝区零》，使用一条龙原 GUI 配置和执行任务。当前 Mac 使用源码环境，本文中的本地开发 `.app` 仍依赖仓库和 `.venv`。
+适用于 Apple Silicon Mac，通过 **PlayCover 4.0 Preview** 运行 iOS 版《绝区零》，使用一条龙原 GUI 配置和执行任务。**PlayCover 3.x 不适用此教程。** 当前 Mac 使用源码环境，本文中的本地开发 `.app` 仍依赖仓库和 `.venv`。
 
 按「游戏可正常登录 → PlayCover 设置 → 一条龙环境 → 平台与权限 → 手柄组件 → 准备游戏 → 任务」的顺序完成首次部署。已有可用环境可直接核对缺少的步骤，无需重装。
 
@@ -8,20 +8,20 @@
 
 - Apple Silicon Mac，使用原生 arm64 终端和 Python。代码依赖 Python `>=3.11.9,<3.12`，下文由 uv 准备 Python 3.11。
 - 安装 Git 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)。已有 Homebrew 时可执行 `brew install uv`；`git --version`、`uv --version` 应能正常输出版本。
-- 按 [PlayCover 官方安装说明](https://docs.playcover.io/getting_started/download_playcover.html) 将 PlayCover 放入「应用程序」，再导入自己合法取得、可用于 PlayCover 的游戏 IPA。安装方式见 [官方 IPA 说明](https://docs.playcover.io/getting_started/download_ipa.html)。
+- 从 [PlayCover 4.0.0 Pre-release 官方发布页](https://github.com/PlayCover/PlayCover/releases/tag/4.0.0-prerelease) 获取 **4.0 Preview**（官方标签为 `4.0.0-prerelease`），按 [PlayCover 官方安装说明](https://docs.playcover.io/getting_started/download_playcover.html) 放入「应用程序」。不要使用默认稳定版入口中的 3.x。再导入自己合法取得、可用于 PlayCover 的游戏 IPA，方式见 [官方 IPA 说明](https://docs.playcover.io/getting_started/download_ipa.html)。
 - 首次自行完成游戏资源下载、登录、必要协议和新手流程，确认能进入大世界。后续一条龙可使用已保存的登录状态，遇到密码、验证码等仍需本人处理。
 
-本文配置表在 2026-11-08 对照本机 **PlayCover 3.1.0（build 1633）** 的游戏设置整理，结合既有实机运行记录；已记录的系统环境为 macOS 26.7.1。其他构建的选项和翻译可能不同，不能只凭「3.1.0」判断是否有全部菜单项；最低系统版本尚未完整验证。
+版本要求以用户当前可用的 **4.0 Preview** 为准。官方发布说明列出了可缩放窗口及 macOS 26 手柄相关修复；本文菜单项按该预发布版本的源码核对。不能用其他安装包的内部版本字段推断 3.x 可用，最低系统版本也尚未完整验证。
 
 ## 2. 配置 PlayCover 中的游戏
 
 **先完全退出游戏，再在 PlayCover 应用库中右键《绝区零》→「设置」。** 下列设置属于这一个游戏；PlayCover 菜单栏中的全局「设置」另有安装偏好。图像等设置需重新启动游戏才生效，见 [官方图像设置说明](https://docs.playcover.io/settings/graphics.html)。
 
-表中「部署基线」来自本机已用配置；必需的画面条件是 **16:9、内容铺满窗口宽度并贴底**。机型、缩放和兼容开关的本机取值不代表每台 Mac 都必须相同。
+下表为配置参考，数值来自已读取的 MacBook Pro 环境；**尚未逐项核对 Mac mini 当前 4.0 Preview 的实际设置**。必需的画面条件是 **16:9、内容铺满窗口宽度并贴底**；机型、缩放和兼容开关不要求每台 Mac 都相同。配置来源与核对范围见[迁移进度](macos_migration_progress.md)。
 
 ### 图像设置（Graphics）
 
-| 选项 | 部署基线 | 说明 |
+| 选项 | 配置参考 | 说明 |
 | --- | --- | --- |
 | 选择 iOS 机型 | iPad Pro 12.9 英寸、第 5 代、M1（`iPad13,8`） | 用于复现现有布局；实际游戏画质还受游戏内设置影响 |
 | 分辨率 | `Resizable`（可缩放窗口） | 可拖动调整窗口大小；部分构建可能仍显示英文 |
@@ -30,44 +30,44 @@
 | 禁用显示器息屏 | 开启 | 防止游戏运行期间显示屏自动关闭；不保证锁屏或跨桌面后继续运行 |
 | 隐藏标题栏（Hide titlebar） | 关闭 | 一条龙默认自动处理顶部标题栏，无需手填本机历史裁剪值 |
 | 浮动窗口（Floating window） | 关闭 | 首次使用普通窗口布局 |
-| 修复窗口化显示问题 | 正常（Normal） | 本机未使用备用修复方式 |
+| 修复窗口化显示问题 | **开启**，方式为正常（Normal） | 开关与修复方式分别设置；参考环境未使用备用方式 |
 
-若版本没有 `Resizable`，可先配置固定 `1080p` 与 `16:9`，再通过后文「准备游戏」确认采集和识别。一条龙会把有效内容归一化到 1920×1080；物理窗口无需占满 1920×1080 像素。自动裁剪只处理顶部余量，左右或底部有黑边、比例变化时应先恢复布局，详见[采集缩放说明](application/macos_capture_scaling.md)。
+若找不到 `Resizable`，先确认安装的是上方链接中的 **4.0 Preview**，并确认游戏已注入 PlayTools。这里不提供退回 3.x 的替代步骤。一条龙会把有效内容归一化到 1920×1080；物理窗口无需占满 1920×1080 像素。自动裁剪只处理顶部余量，左右或底部有黑边、比例变化时应先恢复布局，详见[采集缩放说明](application/macos_capture_scaling.md)。
 
 ### 键盘映射（Keymapping）
 
 一条龙使用 OJD 提供的**原生虚拟手柄**和游戏内手柄界面，无需导入 PlayCover 触屏键位文件。PlayCover 键位映射用于把输入变成触摸，作用见[官方键盘映射说明](https://docs.playcover.io/settings/keymapping.html)。
 
-| 选项 | 部署基线 | 说明 |
+| 选项 | 配置参考 | 说明 |
 | --- | --- | --- |
-| 启用键盘映射布局 | 本机开启，可保留已有设置 | 无需为自动任务新增触屏映射；自行添加过手柄触屏映射时，应排除与原生手柄重复响应 |
+| 启用键盘映射布局 | 参考环境开启，可保留已有设置 | 无需为自动任务新增触屏映射；自行添加过手柄触屏映射时，应排除与原生手柄重复响应 |
 | 智能按键映射 | 开启 | 检测到文本输入时停用映射；不负责切换游戏内输入类型 |
 | 启用滚轮 | 开启 | 自动任务不依赖这个选项 |
-| 禁用原生鼠标输入（Disable Built-in Mouse Support） | 关闭 | 首次部署沿用本机值；启动准备在触屏布局下可能需要短暂前台点击 |
+| 禁用原生鼠标输入（Disable Built-in Mouse Support） | 关闭 | 先按参考值配置；启动准备在触屏布局下可能需要短暂前台点击 |
 | 鼠标灵敏度 | `50` | 属于 PlayCover 鼠标映射；Mac 右摇杆寻路另有[镜头校准](application/macos_turn_calibration.md) |
 
 ### 绕过（Bypasses）
 
-| 选项 | 部署基线 | 说明 |
+| 选项 | 配置参考 | 说明 |
 | --- | --- | --- |
 | 启用 PlayChain | 开启 | 与游戏登录凭据存储有关；已有可登录配置应保留 |
 | PlayChain 调试 | 关闭 | 日常任务无需打开 |
-| 启用绕过越狱检测 | 关闭 | 本机未将此项作为自动化前提 |
-| 插入内省库 | 关闭 | 本机未启用；不要仅为接入一条龙而添加 |
-| 同步检查麦克风权限 | 关闭 | 本机未启用 |
+| 启用绕过越狱检测 | 关闭 | 参考环境未将此项作为自动化前提 |
+| 插入内省库 | 关闭 | 参考环境未启用；不要仅为接入一条龙而添加 |
+| 同步检查麦克风权限 | 关闭 | 参考环境未启用 |
 | 防止频繁调用 `usleep`（Prevent usleep call spamming） | 关闭 | 用于限制系统调用，不是后台保活开关 |
 
 ### 杂项（Misc）和 PlayTools
 
-| 选项 | 部署基线 | 说明 |
+| 选项 | 配置参考 | 说明 |
 | --- | --- | --- |
-| PlayTools | 已注入 | 若提示未安装，使用「注入 PlayTools」；已安装时按钮通常显示「移除 PlayTools」，此时保留即可 |
+| PlayTools | 确认已注入 | 若提示未安装，使用「注入 PlayTools」；已安装时按钮通常显示「移除 PlayTools」，此时保留即可 |
 | 启用 Metal 性能面板 | 关闭 | 首次配置保持无性能浮层的画面 |
 | 在 root 目录启动应用程序 | 开启 | 指游戏工作目录为 `/`，不表示用 root 用户启动一条龙 |
-| 忽略 Unity 键盘初始化错误、限制运动传感器更新频率 | 本机均关闭 | 属于兼容选项，已有可用配置可保留 |
+| 忽略 Unity 键盘初始化错误、限制运动传感器更新频率 | 参考环境均关闭 | 属于兼容选项，已有可用配置可保留 |
 | Discord 活动 | 按个人偏好 | 不作为自动任务条件 |
 
-PlayTools 的图像控制等功能见[官方杂项说明](https://docs.playcover.io/settings/miscellaneous.html)。较新构建的选项归属、Resizable 与自定义比例可对照 [PlayCover 设置源码](https://github.com/PlayCover/PlayCover/blob/24bbed786fe1d5acfb0ffc2e619e126bdc09f22b/PlayCover/Views/AppSettingsView.swift)；部分选项在中文界面仍显示英文。
+PlayTools 的图像控制等功能见[官方杂项说明](https://docs.playcover.io/settings/miscellaneous.html)。PlayBook 部分通用页面仍标注旧版本；本教程的选项归属、Resizable 与自定义比例以 [4.0 Preview 设置源码](https://github.com/PlayCover/PlayCover/blob/4.0.0-prerelease/PlayCover/Views/AppSettingsView.swift) 为准，部分选项在中文界面仍显示英文。
 
 保存后重新打开游戏检查：横屏 16:9、没有左右或底部黑边、能正常登录。游戏内使用中文界面，手柄按键与一条龙 Xbox 映射保持一致。原生手柄模式由后文「准备游戏」自动确认或切换，无需每次手动切换。
 
