@@ -3,11 +3,13 @@
 > 面向第一次接触本项目的人（或 AI agent）：从零把项目在本机跑起来。
 > 也可把本文档链接发给 AI agent，说「按 quickstart 帮我初始化项目」。
 >
-> 分三阶段，每阶段做完都会问「是否继续」——只想先把 GUI 跑起来，做完 **①** 即可。
+> **macOS / Apple Silicon 请使用 [Mac 部署与 PlayCover 设置](macos.md)**。下文是 Windows / PowerShell 流程。
+>
+> 分三阶段；只想先把 GUI 跑起来，做完 **①** 即可，其余阶段按需进行。
 
 ## 前提
 
-- **Windows**：项目仅支持 `win32`（见 `pyproject.toml` 的 `environments`）。
+- **Windows**：下文适用于 `win32`；项目另支持 macOS 原生 `arm64` 环境，使用上方 Mac 教程。
 - **终端**：PowerShell（下文命令均为 PowerShell 语法）。
 - **Git**：已安装。
 
