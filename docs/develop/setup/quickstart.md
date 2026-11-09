@@ -1,14 +1,13 @@
 # 快速开始（Quickstart）
 
 > 面向第一次接触本项目的人（或 AI agent）：从零把项目在本机跑起来。
-> **macOS / Apple Silicon 用户请先看 [Mac 部署教程](../zzz/macos_deployment.md)**，其中包含 PlayCover、权限与原生手柄配置。本文后续命令面向 Windows。
 > 也可把本文档链接发给 AI agent，说「按 quickstart 帮我初始化项目」。
 >
 > 分三阶段，每阶段做完都会问「是否继续」——只想先把 GUI 跑起来，做完 **①** 即可。
 
 ## 前提
 
-- **Windows**：本文使用 Windows 开发入口；Apple Silicon macOS 使用上方独立教程（两种环境均见 `pyproject.toml` 的 `environments`）。
+- **Windows**：项目仅支持 `win32`（见 `pyproject.toml` 的 `environments`）。
 - **终端**：PowerShell（下文命令均为 PowerShell 语法）。
 - **Git**：已安装。
 
