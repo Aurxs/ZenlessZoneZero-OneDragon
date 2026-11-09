@@ -1,6 +1,6 @@
 # macOS 开发与联调工具
 
-首次部署请先读 [macOS 部署与 PlayCover 设置](../../docs/develop/setup/macos.md)，按当前逐页观察值完成配置；本文用于已有环境的开发联调。
+首次部署请先读 [macOS 部署与 PlayCover 设置](../../docs/develop/setup/macos.md)，完成安装与关键配置；本文用于已有环境的开发联调。
 
 日常任务可用正式[无 GUI 命令行入口](../../docs/develop/zzz/application/macos_cli.md)：`PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.cli`。它复用当前账户的原任务配置；下述工具用于开发联调。
 
