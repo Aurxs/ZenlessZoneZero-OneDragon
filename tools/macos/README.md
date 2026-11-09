@@ -1,5 +1,7 @@
 # macOS 开发与联调工具
 
+首次部署请先读 [macOS 部署与 PlayCover 设置](../../docs/develop/setup/macos.md)，按当前逐页观察值完成配置；本文用于已有环境的开发联调。
+
 日常任务可用正式[无 GUI 命令行入口](../../docs/develop/zzz/application/macos_cli.md)：`PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.cli`。它复用当前账户的原任务配置；下述工具用于开发联调。
 
 手柄探测工具独立于一条龙运行环境，不导入 `ZContext`，也不发送桌面键鼠事件。它们用于区分服务可用、GameController 识别和游戏响应；不能代替完整游戏流程测试。阶段及验收条件见 [macOS 迁移方案](../../docs/develop/zzz/macos_migration.md)，固定版本依据见 [手柄调研](../../docs/develop/zzz/macos_gamepad_research.md)。

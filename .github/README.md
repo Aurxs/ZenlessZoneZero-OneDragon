@@ -13,6 +13,7 @@ __ZenlessZoneZero-OneDragon__
 
 <div>
     <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blueviolet">
+    <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-blueviolet">
     <img alt="commit" src="https://img.shields.io/github/commit-activity/m/DoctorReid/ZenlessZoneZero-OneDragon?color=blue">
 </div>
 <div>
@@ -43,6 +44,14 @@ __ZenlessZoneZero-OneDragon__
 ⏲️ __更多功能__： 定时启动、多账号切换、定时任务、自动对话……
 
 </div>
+
+## 🍎 macOS 部署
+
+Apple Silicon Mac 使用 PlayCover 运行 iOS 版《绝区零》，一条龙沿用原 GUI 和任务配置，通过原生手柄操作游戏。
+
+首次安装请按 [macOS 部署与 PlayCover 设置](../docs/develop/setup/macos.md) 操作：包含源码环境、PlayCover 全局五页与游戏五页的逐项设置、系统权限、手柄组件和首次准备游戏。设置以 **2026-11-09 本机逐页观察值**为准，图像设置为 **Resizable（可缩放）＋自定义长宽比 1920:1080＋缩放 1.0**。
+
+Mac 已适配日常任务、自动战斗与部分周常；具体范围看任务卡片及 [迁移进度](../docs/develop/zzz/macos_migration_progress.md)。运行时保持游戏与一条龙在同一桌面，运行实例选“仅运行当前”，“结束后”选“无”。
 
 ## 📸 页面预览
 
