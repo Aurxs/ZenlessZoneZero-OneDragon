@@ -1,6 +1,11 @@
 # AUTO-GENERATED — DO NOT EDIT
 import sys
 if not getattr(sys, 'frozen', False):
+    import AppKit
+    import CoreMedia
+    import Foundation
+    import Quartz
+    import ScreenCaptureKit
     import argparse
     import ast
     import atexit
@@ -13,6 +18,7 @@ if not getattr(sys, 'frozen', False):
     import cv2
     import datetime
     import difflib
+    import dispatch
     import gc
     import gettext
     import glob
@@ -31,10 +37,12 @@ if not getattr(sys, 'frozen', False):
     import matplotlib.font_manager
     import matplotlib.pyplot
     import numpy
+    import objc
     import onnxruntime
     import os
     import os.path
     import platform
+    import plistlib
     import polib
     import psutil
     import pyautogui
@@ -46,6 +54,8 @@ if not getattr(sys, 'frozen', False):
     import random
     import re
     import requests
+    import select
+    import shlex
     import shutil
     import signal
     import smtplib
@@ -58,6 +68,7 @@ if not getattr(sys, 'frozen', False):
     import threading
     import time
     import traceback
+    import unicodedata
     import urllib.error
     import urllib.parse
     import urllib.request
@@ -76,8 +87,8 @@ if not getattr(sys, 'frozen', False):
     import zipfile
     from PIL import Image, ImageDraw, ImageFont
     from PySide6 import QtCore
-    from PySide6.QtCore import QEasingCurve, QEvent, QEventLoop, QMimeData, QObject, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QRegularExpression, QRunnable, QSize, QThread, QThreadPool, QTimer, QUrl, Qt, Signal
-    from PySide6.QtGui import QBrush, QCloseEvent, QColor, QDesktopServices, QDrag, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QEnterEvent, QFont, QFontMetrics, QGuiApplication, QIcon, QImage, QImageReader, QIntValidator, QKeyEvent, QKeySequence, QLinearGradient, QMouseEvent, QPaintEvent, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient, QResizeEvent, QShowEvent, QSyntaxHighlighter, QTextCharFormat, QValidator, QWheelEvent, Qt
+    from PySide6.QtCore import QEasingCurve, QEvent, QEventLoop, QMimeData, QObject, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QRegularExpression, QRunnable, QSize, QStandardPaths, QThread, QThreadPool, QTimer, QUrl, Qt, Signal
+    from PySide6.QtGui import QBrush, QCloseEvent, QColor, QDesktopServices, QDrag, QDragEnterEvent, QDragLeaveEvent, QDragMoveEvent, QDropEvent, QEnterEvent, QFont, QFontMetrics, QGuiApplication, QHideEvent, QIcon, QImage, QImageReader, QIntValidator, QKeyEvent, QKeySequence, QLinearGradient, QMouseEvent, QPaintEvent, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient, QResizeEvent, QShowEvent, QSyntaxHighlighter, QTextCharFormat, QValidator, QWheelEvent, Qt
     from PySide6.QtMultimedia import QMediaPlayer
     from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
     from PySide6.QtWidgets import QAbstractButton, QAbstractItemView, QAbstractScrollArea, QApplication, QComboBox, QCompleter, QDialog, QFileDialog, QFrame, QGraphicsDropShadowEffect, QGraphicsEffect, QGraphicsOpacityEffect, QGraphicsScene, QGraphicsView, QGridLayout, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit, QListView, QListWidget, QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QSizePolicy, QSpacerItem, QSpinBox, QStackedWidget, QStyle, QStyledItemDelegate, QTableWidget, QTableWidgetItem, QTextEdit, QToolButton, QVBoxLayout, QWidget
@@ -91,20 +102,21 @@ if not getattr(sys, 'frozen', False):
     from ctypes import wintypes
     from ctypes.wintypes import DWORD, HANDLE, RECT, SHORT, UINT, WCHAR, WORD
     from cv2.typing import MatLike
-    from dataclasses import dataclass, field, fields
-    from datetime import datetime, timedelta
+    from dataclasses import asdict, dataclass, field, fields, replace
+    from datetime import date, datetime, timedelta
     from email.header import Header
     from email.mime.image import MIMEImage
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     from email.utils import formataddr
     from enum import Enum, IntEnum, StrEnum
-    from functools import cached_property, lru_cache, partial, wraps
+    from functools import cache, cached_property, lru_cache, partial, wraps
     from importlib import metadata
     from io import BytesIO
     from logging import DEBUG
     from logging.handlers import TimedRotatingFileHandler
     from math import isfinite
+    from numpy.typing import NDArray
     from packaging import version
     from pathlib import Path, PurePosixPath, PureWindowsPath
     from pyautogui import screenshot
@@ -131,9 +143,10 @@ if not getattr(sys, 'frozen', False):
     from shapely.geometry import Polygon
     from sklearn.preprocessing import scale
     from soundcard.mediafoundation import SoundcardRuntimeWarning
-    from threading import Event, Lock
-    from types import ModuleType, TracebackType
-    from typing import Any, Callable, ClassVar, Dict, IO, Iterable, List, Literal, NamedTuple, Optional, Protocol, TYPE_CHECKING, Tuple, Type, TypeVar, Union, cast
+    from threading import Event, Lock, RLock
+    from types import FrameType, ModuleType, TracebackType
+    from typing import Any, BinaryIO, Callable, ClassVar, Dict, IO, Iterable, List, Literal, NamedTuple, Optional, Protocol, TYPE_CHECKING, Tuple, Type, TypeVar, Union, cast
     from urllib.parse import urlencode, urljoin, urlparse
     from uuid import uuid4
     from yaml import CSafeLoader, SafeLoader
+    from zoneinfo import ZoneInfo
