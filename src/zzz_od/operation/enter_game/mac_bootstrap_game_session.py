@@ -324,6 +324,13 @@ class MacBootstrapGameSession(Operation):
 
     def _prepare_login_event(self) -> OperationRoundResult | None:
         """可选全新放送先领再退；A、A、B 各自只在对应画面发送一次。"""
+        # 新的七日邦布券活动与旧版全新放送不同；只返回，保留奖励。
+        if (self._has_text('登录后-活动说明', '累计登录7天')
+                and self._has_text('登录后-活动说明', '邦布券')
+                and not self._has_text('登录后-活动说明', '全新放送')
+                and self._has_text('登录后-活动按键', '返回')
+                and self._has_text('登录后-活动按键', 'B')):
+            return self._send_action('关闭七日邦布券活动', gamepad_key='east')
         claimed = '领取版本登录奖励' in self._sent_actions
         confirmed = '确认版本登录奖励' in self._sent_actions
         if claimed and self._has_text('登录后-获得奖励', '获得'):
