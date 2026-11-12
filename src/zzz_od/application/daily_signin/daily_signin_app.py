@@ -50,7 +50,10 @@ class DailySignInApp(ZApplication):
             from zzz_od.operation.gamepad.signin import GamepadDailySignIn
 
             return self.round_by_op_result(
-                GamepadDailySignIn(self.ctx, sub_app_id).execute()
+                GamepadDailySignIn(
+                    self.ctx, sub_app_id,
+                    resume_from_reward=getattr(self.ctx, 'macos_resume_signin_reward', False),
+                ).execute()
             )
 
         app = self.ctx.run_context.get_application(

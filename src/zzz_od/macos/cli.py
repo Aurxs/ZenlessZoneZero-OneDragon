@@ -121,10 +121,13 @@ def main(argv: list[str] | None = None) -> int:
     """默认运行当前账户的一条龙；配置仍由原 GUI 或 YAML 管理。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app', default='one_dragon', help='原任务 ID，默认 one_dragon')
+    parser.add_argument('--resume-signin-reward', action='store_true', help='仅续接已确认的当日卦象奖励或结果页')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--list', action='store_true', help='列出已注册任务及 Mac 支持情况，不操作游戏')
     mode.add_argument('--dry-run', action='store_true', help='检查入口限制并预览已启用任务，不操作游戏')
     args = parser.parse_args(argv)
+    if args.resume_signin_reward and (args.app != 'daily_signin' or args.list or args.dry_run):
+        parser.error('--resume-signin-reward 仅用于实际运行 --app daily_signin')
     if sys.platform != 'darwin' or platform.machine().lower() not in ('arm64', 'aarch64'):
         parser.error('此入口需要 Apple Silicon macOS 和原生 arm64 Python')
 
@@ -140,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
     ctx: ZContext | None = None
     try:
         ctx = ZContext()
+        ctx.macos_resume_signin_reward = args.resume_signin_reward
         # 预览只注册工厂，不调用会加载模型和刷新日记录的 init。
         ctx.register_application_factory()
         ctx.app_group_manager.set_default_apps(ctx.run_context.default_group_apps)
