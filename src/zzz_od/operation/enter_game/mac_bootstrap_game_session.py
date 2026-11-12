@@ -197,6 +197,15 @@ class MacBootstrapGameSession(Operation):
 
     def _prepare_from_screen(self) -> OperationRoundResult:
         """按正面证据选择手柄登录、触屏设置和返回路径。"""
+        if getattr(self.ctx, 'macos_resume_signin_reward', False):
+            # 仅显式续接已确认的签到奖励或结果页，未知画面不能继续。
+            from zzz_od.operation.gamepad.signin import GamepadDailySignIn
+
+            signin = GamepadDailySignIn(self.ctx, 'trigrams_collection', resume_from_reward=True)
+            signin.last_screenshot = self.last_screenshot
+            if signin._reward_visible() or signin._result_visible():
+                return self.round_success('已确认签到奖励或结果页面')
+            return self.round_fail('未确认签到奖励或结果页面，未发送输入')
         interrupted = self._prepare_interrupted_challenge()
         if interrupted is not None:
             return interrupted
@@ -359,6 +368,20 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail('全新放送未识别到可领取焦点，未跳过奖励')
         return None
 
+    def _login_gamepad_hint_visible(self) -> bool:
+        """复用旧图标，并兼容当前窗口尺寸下的登录图标。"""
+        if self._area_found('登录-手柄进入提示'):
+            return True
+        matcher = getattr(self.ctx, 'tm', None)
+        area = self.ctx.screen_loader.get_area(self.SCREEN_NAME, '登录-手柄进入提示')
+        if matcher is None or area is None:
+            return False
+        matches = matcher.crop_and_match_template(
+            self.last_screenshot, area.rect, 'ios_gamepad',
+            'bootstrap_login_gamepad_enter_1132', threshold=0.9,
+        )
+        return matches.max is not None
+
     def _prepare_login(self) -> OperationRoundResult | None:
         """只处理已建档的登录就绪页，成对凭据提示出现时停止。"""
         credential_pairs = (
@@ -378,7 +401,7 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail('需要完成账号登录或验证，请在游戏中完成后重新准备')
 
         if (
-            self._area_found('登录-手柄进入提示')
+            self._login_gamepad_hint_visible()
             and self._has_text('登录-手柄主提示', '进入游戏')
         ):
             self._gamepad_confirmed = True
