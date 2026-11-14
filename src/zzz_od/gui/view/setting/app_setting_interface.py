@@ -35,12 +35,6 @@ class AppSettingInterface(PivotNavigatorInterface):
             )
 
             self.add_sub_interface(SettingGamepadInterface(ctx=self.ctx))
-        if sys.platform == 'win32':
-            from zzz_od.gui.view.setting.setting_overlay_interface import (
-                SettingOverlayInterface,
-            )
-
-            self.add_sub_interface(SettingOverlayInterface(ctx=self.ctx))
         self.add_sub_interface(SettingEnvInterface(ctx=self.ctx))
         self.add_sub_interface(SettingPushInterface(ctx=self.ctx))
         self.add_sub_interface(SettingCustomInterface(ctx=self.ctx))
