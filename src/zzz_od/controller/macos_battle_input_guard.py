@@ -33,7 +33,7 @@ class MacBattleHudGuard:
             return False
         for area in (self.battle.area_chain_1, self.battle.area_chain_2):
             part = cv2_utils.crop_image_only(image, area.rect)
-            if self.battle._match_chain_agent_in(part, agents) is not None:
+            if self.battle._match_chain_agent_in(part, agents, area.rect) is not None:
                 return True
         return False
 
