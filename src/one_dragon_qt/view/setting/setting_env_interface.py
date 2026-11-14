@@ -72,7 +72,8 @@ class SettingEnvInterface(VerticalScrollInterface):
         if sys.platform == 'win32':
             self.screenshot_method_opt: ComboBoxSettingCard = ComboBoxSettingCard(
                 icon=FluentIcon.CAMERA, title='截图方法',
-                options_enum=ScreenshotMethodEnum
+                content='前台要求窗口无遮挡，后台要求窗口不被最小化',
+                options_enum=ScreenshotMethodEnum,
             )
             self.screenshot_method_opt.value_changed.connect(lambda: self.ctx.init_controller())
             basic_group.addSettingCard(self.screenshot_method_opt)
