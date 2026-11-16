@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+import cv2
 import numpy as np
 
 from one_dragon.base.operation.operation_edge import node_from
@@ -73,6 +74,29 @@ class GamepadRiduWeekly(_GamepadRewardOperation):
             self._text_rect(area[1], text) is not None for text in ('积分特赏', '累计获取积分')
         )
 
+    def _confirmed_unfinished_progress(self, cell: np.ndarray, texts: list[str]) -> bool:
+        """仅当两次局部识别一致时，确认漏掉斜杠的单数字未完成进度。"""
+        candidates = set()
+        for text in texts:
+            match = re.fullmatch(r'(\d)1(\d)', text)
+            if match and int(match[1]) < int(match[2]):
+                candidates.add(f'{match[1]}/{match[2]}')
+        if len(candidates) != 1 or not cell.size:
+            return False
+        height, width = cell.shape[:2]
+        progress = cell[int(height * .32):int(height * .67), int(width * .18):int(width * .82)]
+        if not progress.size:
+            return False
+        gray = cv2.cvtColor(progress, cv2.COLOR_BGR2GRAY)
+        expected = next(iter(candidates))
+        for threshold in (160, 180):
+            _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+            binary = cv2.copyMakeBorder(binary, 12, 12, 12, 12, cv2.BORDER_CONSTANT, value=0)
+            image = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
+            if self.ctx.ocr.run_ocr_single_line(image).replace(' ', '') != expected:
+                return False
+        return True
+
     def grid_state(self) -> tuple[list[int], list[int], list[int], list[int]]:
         """按从左到右、从上到下的 1～9 格区分已领、未完成、可领及未知。"""
         area = self._read_area('丽都周纪', '手柄-九宫格')
@@ -106,6 +130,13 @@ class GamepadRiduWeekly(_GamepadRewardOperation):
             progress = [re.search(r'(\d+)\s*/\s*(\d+)', text) for text in texts]
             values = {(int(match[1]), int(match[2])) for match in progress if match is not None}
             if len(values) != 1:
+                cell = image[
+                    row * height // 3:(row + 1) * height // 3,
+                    column * width // 3:(column + 1) * width // 3,
+                ]
+                if not values and self._confirmed_unfinished_progress(cell, texts):
+                    unfinished.append(index)
+                    continue
                 unknown.append(index)
                 continue
             current, target = next(iter(values))
