@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
+
+import cv2
 
 from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.operation import Operation
@@ -12,6 +17,8 @@ from one_dragon.utils.log_utils import log
 from zzz_od.operation.gamepad.focus import has_filled_highlight
 
 if TYPE_CHECKING:
+    from one_dragon.base.operation.operation_result import OperationResult
+
     from one_dragon.base.controller.macos.macos_bootstrap_pointer import (
         MacBootstrapPointer,
     )
@@ -103,8 +110,43 @@ class MacBootstrapGameSession(Operation):
     def _wait_after_action(self, action: str) -> OperationRoundResult:
         """同一步不连点；五秒仍未变化时明确停止。"""
         if time.time() - self._last_action_time >= 5:
-            return self.round_fail(f'{action}后画面没有按预期变化，已停止准备')
+            return self._failure_with_evidence('动作后等待', f'{action}后画面没有按预期变化，已停止准备')
         return self.round_wait(f'等待{action}后的新画面', wait=0.4)
+
+    def _failure_with_evidence(
+        self, phase: str, status: str, *, use_frame: bool = True,
+    ) -> OperationRoundResult:
+        """失败时只保存当前有效帧到本机私有临时目录，不记录识别文字。"""
+        frame_status = '无有效新帧'
+        frame_current = (use_frame and self.ctx.is_game_window_ready and self.last_screenshot is not None
+                         and self.last_screenshot_time > self._last_action_time)
+        if frame_current:
+            try:
+                image = cv2.cvtColor(self.last_screenshot, cv2.COLOR_RGB2BGR)
+                ok, encoded = cv2.imencode('.png', image)
+                if not ok:
+                    raise ValueError('PNG 编码失败')
+                directory = Path(tempfile.mkdtemp(prefix='zzz-bootstrap-', dir='/tmp'))
+                path = directory / 'failure.png'
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, 'wb') as output:
+                    output.write(encoded.tobytes())
+                frame_status = str(path)
+            except Exception as error:
+                frame_status = '保存失败'
+                log.warning('Mac 启动失败截图保存失败：%s', type(error).__name__)
+        log.warning(
+            'Mac 启动失败 phase=%s cold_start=%s unknown_frames=%s attempted_actions=%s frame=%s',
+            phase, self._cold_start, self._unknown_frames, sorted(self._sent_actions),
+            frame_status,
+        )
+        return self.round_fail(status)
+
+    def after_operation_done(self, result: OperationResult) -> None:
+        """框架超时也记录阶段，但不把可能过期的帧当作当前画面。"""
+        if not result.success and result.status == Operation.STATUS_TIMEOUT:
+            self._failure_with_evidence('流程超时', result.status, use_frame=False)
+        super().after_operation_done(result)
 
     def _send_action(
         self, action: str, *, area_name: str | None = None,
@@ -182,7 +224,7 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail('Mac 手柄连接不可用，未执行启动点击')
         self.screenshot()
         if self.last_screenshot is None:
-            return self.round_fail('Mac 游戏截图不可用，未执行启动点击')
+            return self._failure_with_evidence('采集', 'Mac 游戏截图不可用，未执行启动点击')
         if self.last_screenshot.shape != (1080, 1920, 3):
             return self.round_fail('Mac 启动截图不是标准 1920×1080，未执行启动点击')
         if self.last_screenshot_time <= self._last_action_time:
@@ -206,9 +248,20 @@ class MacBootstrapGameSession(Operation):
             if signin._reward_visible() or signin._result_visible():
                 return self.round_success('已确认签到奖励或结果页面')
             return self.round_fail('未确认签到奖励或结果页面，未发送输入')
-        interrupted = self._prepare_interrupted_challenge()
-        if interrupted is not None:
-            return interrupted
+        if getattr(self.ctx, 'macos_resume_lost_void', False):
+            if '继续战线肃清' in self._sent_actions and self.ctx.lost_void.in_normal_world(self.last_screenshot):
+                self.ctx.macos_lost_void_resumed = True
+                self.save_screenshot(prefix='macos_lost_void_resumed')
+                return self.round_success('已确认续接战线肃清局内场景')
+            interrupted = self._prepare_interrupted_challenge()
+            if interrupted is not None:
+                return interrupted
+            if self.round_by_find_area(self.last_screenshot, '大世界-普通', '快捷手册').is_success:
+                return self.round_fail('未发现可续接的战线肃清，未开始新挑战')
+        else:
+            interrupted = self._prepare_interrupted_challenge()
+            if interrupted is not None:
+                return interrupted
         if self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册',
         ).is_success:
@@ -318,12 +371,22 @@ class MacBootstrapGameSession(Operation):
         """与原登录流程一致取消未完成挑战，先核对提示、选项和实际焦点。"""
         if not self._has_text('登录后-未完成挑战说明', '当前正在处理'):
             return None
+        resume_lost_void = getattr(self.ctx, 'macos_resume_lost_void', False)
+        if resume_lost_void and not self._has_text('登录后-未完成挑战说明', '战线肃清'):
+            return self.round_fail('未完成挑战不是已授权的战线肃清，未发送输入')
         buttons = '登录后-未完成挑战按钮'
         cancel = self._text_rect(buttons, '取消')
         confirm = self._text_rect(buttons, '确认')
         if (cancel is None or confirm is None or not self._has_text(buttons, '选择')
                 or not self._area_found('登录后-未完成挑战选择')):
             return None
+        if resume_lost_void:
+            if has_filled_highlight(self.last_screenshot, confirm, 'yellow'):
+                self.save_screenshot(prefix='macos_lost_void_resume_prompt')
+                return self._send_action('继续战线肃清', gamepad_key='south')
+            if not has_filled_highlight(self.last_screenshot, cancel, 'yellow'):
+                return self.round_fail('未完成挑战选项焦点不明确，已停止')
+            return self._send_action('选择继续战线肃清', gamepad_key='dpad_right')
         if has_filled_highlight(self.last_screenshot, cancel, 'yellow'):
             self.save_screenshot(prefix='macos_interrupted_challenge_cancel')
             return self._send_action('取消未完成挑战', gamepad_key='south')
@@ -421,7 +484,7 @@ class MacBootstrapGameSession(Operation):
     def _wait_for_login(self) -> OperationRoundResult:
         """进入一次后最多等六十秒，不重复 A 或用鼠标尝试推进。"""
         if self._login_wait_until is None or time.time() >= self._login_wait_until:
-            return self.round_fail('进入游戏后等待60秒仍未确认手柄大世界')
+            return self._failure_with_evidence('进入账号后等待', '进入游戏后等待60秒仍未确认手柄大世界')
         return self.round_wait('等待登录与场景加载，未重复输入', wait=0.5)
 
     def _wait_for_known_screen(self) -> OperationRoundResult:
@@ -430,9 +493,9 @@ class MacBootstrapGameSession(Operation):
             return self._wait_for_login()
         if self._startup_wait_until is not None:
             if time.time() >= self._startup_wait_until:
-                return self.round_fail('冷启动等待60秒仍未识别到可继续的登录或游戏画面')
+                return self._failure_with_evidence('冷启动识别', '冷启动等待60秒仍未识别到可继续的登录或游戏画面')
             return self.round_wait('等待冷启动登录画面，未发送输入', wait=0.5)
         self._unknown_frames += 1
         if self._unknown_frames >= 8:
-            return self.round_fail('未识别到已支持的 Mac 启动画面，已停止且未猜测点击')
+            return self._failure_with_evidence('启动识别', '未识别到已支持的 Mac 启动画面，已停止且未猜测点击')
         return self.round_wait('等待已建档的 Mac 启动画面', wait=0.4)

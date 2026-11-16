@@ -471,6 +471,7 @@ class GamepadLostVoidRunLevel(GamepadMenuDelayMixin, LostVoidRunLevel):
 
             result=GamepadLostVoidBangbooStore(self.ctx).execute()
             if result.success:
+                self.ctx.macos_resume_store_refreshed = False
                 # 商店 NPC 的图标会保留，沿用原流程的本层忽略列表避免反复走回。
                 if '邦布商店' not in self.had_been_list:
                     self.had_been_list.append('邦布商店')
