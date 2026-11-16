@@ -115,7 +115,8 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
     def __init__(self, ctx: ZContext, refresh_times: int = 0) -> None:
         super().__init__(ctx, op_name='手柄迷失之地邦布商店', timeout_seconds=180)
         self.parser: LostVoidBangbooStore = LostVoidBangbooStore(ctx)
-        self.parser.refresh_times = refresh_times
+        self._resume_refreshed: bool = getattr(ctx, 'macos_resume_store_refreshed', False) is True
+        self.parser.refresh_times = max(refresh_times, 1) if self._resume_refreshed else refresh_times
         self.navigation: GamepadTransportByCompendium = GamepadTransportByCompendium(
             ctx, '作战', '周期征讨'
         )
@@ -157,13 +158,24 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
         if prices and price_area:
             for text, matches in prices[1].items():
                 price = self.parse_price(text)
-                if price is None:
-                    continue
+                icon_prefix_price = re.fullmatch(r'0[×xX]\s*(\d+)\s*', text.strip())
                 for match in matches:
                     rect = match.rect
                     rect.add_offset(price_area.left_top)
-                    for item in all_goods:
-                        item.add_price(price, rect)
+                    if price is not None:
+                        for item in all_goods:
+                            item.add_price(price, rect)
+                    elif icon_prefix_price is not None and len(all_goods) == 4:
+                        ordered = sorted(all_goods, key=lambda item: item.rect.center.x)
+                        candidates = [(idx, item) for idx, item in enumerate(ordered, 1)
+                                      if abs(item.rect.center.x - rect.center.x) < item.rect.width]
+                        if len(candidates) != 1:
+                            continue
+                        idx, item = candidates[0]
+                        if any(self.round_by_find_area(
+                            self.last_screenshot, '迷失之地-邦布商店', f'{prefix}-{idx}',
+                        ).is_success for prefix in ('手柄-商品金币', '手柄-商品金币高亮')):
+                            item.add_price(int(icon_prefix_price[1]), rect)
         buttons = self.navigation._read_area('迷失之地-邦布商店', '区域-购买按钮')
         area = self.ctx.screen_loader.get_area('迷失之地-邦布商店', '区域-购买按钮')
         if buttons and area:
@@ -349,7 +361,8 @@ class GamepadLostVoidBangbooStore(GamepadOperation):
             text = ''.join(refresh[1]).upper().replace(' ', '') if refresh else ''
             costs = {int(value) for value in re.findall(r'[×X](\d+)', text)}
             if (
-                len(costs) == 1
+                not self._resume_refreshed
+                and len(costs) == 1
                 and next(iter(costs)) <= balance
                 and 'RS' in text
                 and '刷新' in text

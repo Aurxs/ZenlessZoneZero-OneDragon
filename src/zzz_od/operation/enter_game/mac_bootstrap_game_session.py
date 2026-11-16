@@ -239,9 +239,29 @@ class MacBootstrapGameSession(Operation):
 
     def _prepare_from_screen(self) -> OperationRoundResult:
         """按正面证据选择手柄登录、触屏设置和返回路径。"""
-        interrupted = self._prepare_interrupted_challenge()
-        if interrupted is not None:
-            return interrupted
+        if getattr(self.ctx, 'macos_resume_signin_reward', False):
+            # 仅显式续接已确认的签到奖励或结果页，未知画面不能继续。
+            from zzz_od.operation.gamepad.signin import GamepadDailySignIn
+
+            signin = GamepadDailySignIn(self.ctx, 'trigrams_collection', resume_from_reward=True)
+            signin.last_screenshot = self.last_screenshot
+            if signin._reward_visible() or signin._result_visible():
+                return self.round_success('已确认签到奖励或结果页面')
+            return self.round_fail('未确认签到奖励或结果页面，未发送输入')
+        if getattr(self.ctx, 'macos_resume_lost_void', False):
+            if '继续战线肃清' in self._sent_actions and self.ctx.lost_void.in_normal_world(self.last_screenshot):
+                self.ctx.macos_lost_void_resumed = True
+                self.save_screenshot(prefix='macos_lost_void_resumed')
+                return self.round_success('已确认续接战线肃清局内场景')
+            interrupted = self._prepare_interrupted_challenge()
+            if interrupted is not None:
+                return interrupted
+            if self.round_by_find_area(self.last_screenshot, '大世界-普通', '快捷手册').is_success:
+                return self.round_fail('未发现可续接的战线肃清，未开始新挑战')
+        else:
+            interrupted = self._prepare_interrupted_challenge()
+            if interrupted is not None:
+                return interrupted
         if self.round_by_find_area(
             self.last_screenshot, '大世界-普通', '快捷手册',
         ).is_success:
@@ -351,12 +371,22 @@ class MacBootstrapGameSession(Operation):
         """与原登录流程一致取消未完成挑战，先核对提示、选项和实际焦点。"""
         if not self._has_text('登录后-未完成挑战说明', '当前正在处理'):
             return None
+        resume_lost_void = getattr(self.ctx, 'macos_resume_lost_void', False)
+        if resume_lost_void and not self._has_text('登录后-未完成挑战说明', '战线肃清'):
+            return self.round_fail('未完成挑战不是已授权的战线肃清，未发送输入')
         buttons = '登录后-未完成挑战按钮'
         cancel = self._text_rect(buttons, '取消')
         confirm = self._text_rect(buttons, '确认')
         if (cancel is None or confirm is None or not self._has_text(buttons, '选择')
                 or not self._area_found('登录后-未完成挑战选择')):
             return None
+        if resume_lost_void:
+            if has_filled_highlight(self.last_screenshot, confirm, 'yellow'):
+                self.save_screenshot(prefix='macos_lost_void_resume_prompt')
+                return self._send_action('继续战线肃清', gamepad_key='south')
+            if not has_filled_highlight(self.last_screenshot, cancel, 'yellow'):
+                return self.round_fail('未完成挑战选项焦点不明确，已停止')
+            return self._send_action('选择继续战线肃清', gamepad_key='dpad_right')
         if has_filled_highlight(self.last_screenshot, cancel, 'yellow'):
             self.save_screenshot(prefix='macos_interrupted_challenge_cancel')
             return self._send_action('取消未完成挑战', gamepad_key='south')
@@ -366,6 +396,13 @@ class MacBootstrapGameSession(Operation):
 
     def _prepare_login_event(self) -> OperationRoundResult | None:
         """可选全新放送先领再退；A、A、B 各自只在对应画面发送一次。"""
+        # 新的七日邦布券活动与旧版全新放送不同；只返回，保留奖励。
+        if (self._has_text('登录后-活动说明', '累计登录7天')
+                and self._has_text('登录后-活动说明', '邦布券')
+                and not self._has_text('登录后-活动说明', '全新放送')
+                and self._has_text('登录后-活动按键', '返回')
+                and self._has_text('登录后-活动按键', 'B')):
+            return self._send_action('关闭七日邦布券活动', gamepad_key='east')
         claimed = '领取版本登录奖励' in self._sent_actions
         confirmed = '确认版本登录奖励' in self._sent_actions
         if claimed and self._has_text('登录后-获得奖励', '获得'):
@@ -394,6 +431,20 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail('全新放送未识别到可领取焦点，未跳过奖励')
         return None
 
+    def _login_gamepad_hint_visible(self) -> bool:
+        """复用旧图标，并兼容当前窗口尺寸下的登录图标。"""
+        if self._area_found('登录-手柄进入提示'):
+            return True
+        matcher = getattr(self.ctx, 'tm', None)
+        area = self.ctx.screen_loader.get_area(self.SCREEN_NAME, '登录-手柄进入提示')
+        if matcher is None or area is None:
+            return False
+        matches = matcher.crop_and_match_template(
+            self.last_screenshot, area.rect, 'ios_gamepad',
+            'bootstrap_login_gamepad_enter_1132', threshold=0.9,
+        )
+        return matches.max is not None
+
     def _prepare_login(self) -> OperationRoundResult | None:
         """只处理已建档的登录就绪页，成对凭据提示出现时停止。"""
         credential_pairs = (
@@ -413,7 +464,7 @@ class MacBootstrapGameSession(Operation):
             return self.round_fail('需要完成账号登录或验证，请在游戏中完成后重新准备')
 
         if (
-            self._area_found('登录-手柄进入提示')
+            self._login_gamepad_hint_visible()
             and self._has_text('登录-手柄主提示', '进入游戏')
         ):
             self._gamepad_confirmed = True

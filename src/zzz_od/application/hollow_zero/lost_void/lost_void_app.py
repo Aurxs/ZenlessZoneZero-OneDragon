@@ -94,6 +94,13 @@ class LostVoidApp(ZApplication):
         if self.lost_void_debug:
             return self.round_success('迷失之地-大世界')
         if sys.platform == 'darwin':
+            if getattr(self.ctx, 'macos_resume_lost_void', False):
+                if not getattr(self.ctx, 'macos_lost_void_resumed', False):
+                    return self.round_fail('未确认续接战线肃清，未开始新挑战')
+                if self.last_screenshot is None or not self.ctx.lost_void.in_normal_world(self.last_screenshot):
+                    return self.round_retry('等待续接后的局内画面', wait=1)
+                self.ctx.lost_void.predefined_team_idx = self.ctx.lost_void.challenge_config.predefined_team_idx
+                return self.round_success('迷失之地-大世界')
             return self.round_success('未识别初始画面')
         result = self.round_by_find_and_click_area(self.last_screenshot, '迷失之地-大世界', '按钮-挑战-确认')
         # 特殊兼容：在挑战区域开始，接力运行
