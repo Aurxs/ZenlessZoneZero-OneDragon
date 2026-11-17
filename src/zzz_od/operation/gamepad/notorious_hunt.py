@@ -431,8 +431,8 @@ class GamepadHuntDeploy(GamepadOperation):
             strategy = team.auto_battle
         self.ctx.auto_battle_context.init_auto_op(op_name=strategy, sub_dir='auto_battle')
         auto_op = self.ctx.auto_battle_context.auto_op
-        if auto_op is None or auto_op.auto_turn_interval != 0:
-            return self.round_fail('Mac 策略须关闭未校准的自动转向')
+        if auto_op is None:
+            return self.round_fail('自动战斗策略未加载')
         if not self._sent:
             self.ctx.controller.btn_tap('start')
             self._sent = True
@@ -584,8 +584,8 @@ class GamepadHuntBattle(GamepadOperation):
             self.save_screenshot(prefix='macos_hunt_battle_entry_pending')
             return self.round_retry('等待有效战斗 HUD', wait=0.5)
         self.original.init_auto_battle()
-        if self.ctx.auto_battle_context.auto_op.auto_turn_interval != 0:
-            return self.round_fail('Mac 战斗策略须关闭未校准的自动转向')
+        if self.ctx.auto_battle_context.auto_op is None:
+            return self.round_fail('自动战斗策略未加载')
         self.ctx.controller.begin_battle_input_scope(MacBattleHudGuard(self.ctx.auto_battle_context))
         self._scope = True
         self.original.start_auto_op()

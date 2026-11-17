@@ -53,6 +53,8 @@ Apple Silicon Mac 使用 PlayCover 运行 iOS 版《绝区零》，一条龙沿�
 
 Mac 已适配日常任务、自动战斗与部分周常；具体范围看任务卡片及 [迁移进度](../docs/develop/zzz/macos_migration_progress.md)。运行时保持游戏与一条龙在同一桌面，运行实例选“仅运行当前”，“结束后”选“无”。
 
+首次运行迷失之地前，须按部署指南完成 [手柄镜头校准](../docs/develop/setup/macos.md#手柄镜头校准迷失之地必做)。普通体力战斗无需先校准，缺少镜头参数时会自动关闭本次战斗的周期转向。
+
 ## 📸 页面预览
 
 <div align="center">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -156,7 +157,12 @@ class AutoBattleOperator(ConditionalOperator):
         2. 转向 - 有机会找到后方太远的敌人；迷失之地可以转动下层入口
         :return:
         """
-        if self.auto_lock_interval <= 0 and self.auto_turn_interval <= 0:  # 不开启自动锁定 和 自动转向
+        auto_turn_interval = self.auto_turn_interval
+        if sys.platform == 'darwin':
+            from zzz_od.operation.gamepad.auto_turn import get_auto_turn_interval
+
+            auto_turn_interval = get_auto_turn_interval(self.ctx.ctx, auto_turn_interval)
+        if self.auto_lock_interval <= 0 and auto_turn_interval <= 0:  # 不开启自动锁定 和 自动转向
             return
         lock_op = AtomicBtnLock(self.ctx)
         turn_op = AtomicTurn(self.ctx, 100)
@@ -177,7 +183,7 @@ class AutoBattleOperator(ConditionalOperator):
                 any_done = True
             if not self.is_running:
                 break
-            if self.auto_turn_interval > 0 and now - self.last_turn_time > self.auto_turn_interval:
+            if auto_turn_interval > 0 and now - self.last_turn_time > auto_turn_interval:
                 turn_op.execute()
                 self.last_turn_time = now
                 any_done = True

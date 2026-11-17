@@ -172,7 +172,7 @@ class GamepadCombatSimulation(GamepadOperation):
     @node_from(from_name='检查手柄计划')
     @operation_node(name='加载既有自动战斗')
     def prepare_auto_battle(self) -> OperationRoundResult:
-        """出战前加载原策略，保留尚未校准的自动转向限制。"""
+        """出战前加载原策略，缺少镜头参数的周期转向由执行器自动关闭。"""
         if self.prepare_only:
             return self.round_success()
         battle = self.ctx.auto_battle_context
@@ -183,8 +183,8 @@ class GamepadCombatSimulation(GamepadOperation):
                 return self.round_fail('预备编队配置不存在')
             strategy = team.auto_battle
         battle.init_auto_op(op_name=strategy, sub_dir='auto_battle')
-        if battle.auto_op is None or battle.auto_op.auto_turn_interval != 0:
-            return self.round_fail('Mac 自动战斗策略须关闭尚未校准的自动转向')
+        if battle.auto_op is None:
+            return self.round_fail('自动战斗策略未加载')
         return self.round_success()
 
     @node_from(from_name='加载既有自动战斗')
