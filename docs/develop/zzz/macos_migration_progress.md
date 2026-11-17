@@ -2,6 +2,11 @@
 
 更新时间：2026-11-17。后续会话先读本文件，再按当前阶段阅读设计与源码；完成一项验证后更新对应状态，不把计划当作已实现。
 
+## 2026-11-17 明确 PlayCover 实际使用的发行版本
+
+- 用户确认实际使用 [PlayCover 4.0.0 Pre-release](https://github.com/PlayCover/PlayCover/releases/tag/4.0.0-prerelease)，已核对官方发行页的预发布标识。README 和部署指南补齐标签 `4.0.0-prerelease`、下载链接及预发布说明，后续部署以该发行包为准。
+- 部署指南不再将 `3.1.0（1633）` 写为配置参考版本；下方历史记录中的该版本号是当时关于窗口的显示值，保留原始观察。纯文档修改，仅做差异空白检查，未重装 PlayCover、操作游戏或重跑功能测试。
+
 ## 2026-11-17 修正 Mac 更新来源并同步仓库改名
 
 - GitHub 已将个人主仓改名为 `Aurxs/ZenlessZoneZero-OneDragon-MacOS`，测试仓仍为 `Aurxs/zzz-od-test`；本地目录无需改名。README、首次克隆与更新说明、项目主页及反馈链接统一使用新地址，历史记录中的旧仓库名保留原貌。

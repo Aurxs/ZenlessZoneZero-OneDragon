@@ -47,6 +47,8 @@ __ZenlessZoneZero-OneDragon-MacOS__
 
 Apple Silicon Mac 使用 PlayCover 运行 iOS 版《绝区零》，一条龙沿用原 GUI 和任务配置，通过原生手柄操作游戏。
 
+本项目实际使用 [PlayCover 4.0.0 Pre-release](https://github.com/PlayCover/PlayCover/releases/tag/4.0.0-prerelease)（标签 `4.0.0-prerelease`，预发布版），首次部署请从该发行页下载。
+
 本仓库是 [上游一条龙](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 的 Mac 版，安装和更新请使用 [Aurxs/ZenlessZoneZero-OneDragon-MacOS](https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS)。已有安装目录无需随仓库改名；旧 `origin` 地址的处理见更新说明。
 
 首次安装请按 [macOS 部署与 PlayCover 设置](../docs/develop/setup/macos.md) 操作：包含源码环境、PlayCover 图像与游戏设置、系统权限、手柄组件和首次准备游戏。图像设置为 **Resizable（可缩放）＋自定义长宽比 1920:1080＋缩放 1.0**。

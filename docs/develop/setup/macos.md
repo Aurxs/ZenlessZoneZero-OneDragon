@@ -4,9 +4,9 @@
 
 ## 1. 安装 PlayCover 和游戏
 
-1. 按 [PlayCover 官方说明](https://docs.playcover.io/getting_started/download_playcover.html) 安装 PlayCover。
+1. 下载本项目实际使用的 [PlayCover 4.0.0 Pre-release](https://github.com/PlayCover/PlayCover/releases/tag/4.0.0-prerelease)（标签 `4.0.0-prerelease`，预发布版），按 [PlayCover 官方说明](https://docs.playcover.io/getting_started/download_playcover.html) 安装。
 2. 准备《绝区零》已解密的 iOS `.ipa`，拖入 PlayCover App 库安装，要求见 [官方 IPA 安装说明](https://docs.playcover.io/getting_started/download_ipa.html)。本项目不提供游戏安装包。
-3. **完全退出游戏**，右键 App 库中的“绝区零”→ **设置**，核对下表。选项名称参考 PlayCover **3.1.0（1633）**。
+3. **完全退出游戏**，右键 App 库中的“绝区零”→ **设置**，核对下表。本指南以该 **4.0.0 预发布版**为部署基准。
 
 | 页面 | 设置 | 值 |
 |---|---|---|
