@@ -167,15 +167,3 @@ Approvers: [DoctorReid](https://github.com/DoctorReid) [ShadowLemoon](https://gi
 本程序的隐私政策详见：[隐私政策](PRIVACY.md)。
 
 See the [Privacy Policy](PRIVACY.md).
-
-## ☕ 支持我们
-
-<div align="center">
-
-如果本项目为您带来便利，欢迎支持服务器维护：
-
-<img src="./image/sponsor.png" width = "480" alt="图片名称" align=center />
-
-💖 查看[致谢名单](https://onedragon-anything.github.io/other/zh/like/thanks_2024.html)
-
-</div>
