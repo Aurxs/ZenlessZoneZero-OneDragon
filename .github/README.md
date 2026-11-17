@@ -1,24 +1,22 @@
 <!-- markdownlint-restore -->
 <div align="center">
 
-<img src="https://socialify.git.ci/DoctorReid/ZenlessZoneZero-OneDragon/image?description=1&font=Inter&language=1&logo=https%3A%2F%2Fgithub.com%2FDoctorReid%2FZenlessZoneZero-OneDragon%2Fblob%2Fmain%2F.github%2Fimage%2Fellen.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Charlie+Brown&theme=Light" alt="ZenlessZoneZero-OneDragon"/>
+<img src="https://socialify.git.ci/Aurxs/ZenlessZoneZero-OneDragon-MacOS/image?description=1&font=Inter&language=1&logo=https%3A%2F%2Fgithub.com%2FAurxs%2FZenlessZoneZero-OneDragon-MacOS%2Fblob%2Fmain%2F.github%2Fimage%2Fellen.png%3Fraw%3Dtrue&name=1&owner=1&pattern=Charlie+Brown&theme=Light" alt="ZenlessZoneZero-OneDragon-MacOS"/>
 <div>
 
 ---
 
 </div>
 
-__ZenlessZoneZero-OneDragon__
+__ZenlessZoneZero-OneDragon-MacOS__
 
 
 <div>
-    <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blueviolet">
     <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-blueviolet">
-    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/DoctorReid/ZenlessZoneZero-OneDragon?color=blue">
+    <img alt="commit" src="https://img.shields.io/github/commit-activity/m/Aurxs/ZenlessZoneZero-OneDragon-MacOS?color=blue">
 </div>
 <div>
-    <img alt="stars" src="https://img.shields.io/github/stars/DoctorReid/ZenlessZoneZero-OneDragon?style=social">
-    <img alt="GitHub all releases" src="https://img.shields.io/github/downloads/DoctorReid/ZenlessZoneZero-OneDragon/total?style=social">
+    <img alt="stars" src="https://img.shields.io/github/stars/Aurxs/ZenlessZoneZero-OneDragon-MacOS?style=social">
 </div>
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/OneDragon-Anything/ZenlessZoneZero-OneDragon)
@@ -49,11 +47,47 @@ __ZenlessZoneZero-OneDragon__
 
 Apple Silicon Mac 使用 PlayCover 运行 iOS 版《绝区零》，一条龙沿用原 GUI 和任务配置，通过原生手柄操作游戏。
 
-首次安装请按 [macOS 部署与 PlayCover 设置](../docs/develop/setup/macos.md) 操作：包含源码环境、PlayCover 全局五页与游戏五页的逐项设置、系统权限、手柄组件和首次准备游戏。设置以 **2026-11-09 本机逐页观察值**为准，图像设置为 **Resizable（可缩放）＋自定义长宽比 1920:1080＋缩放 1.0**。
+本仓库是 [上游一条龙](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 的 Mac 版，安装和更新请使用 [Aurxs/ZenlessZoneZero-OneDragon-MacOS](https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS)。已有安装目录无需随仓库改名；旧 `origin` 地址的处理见更新说明。
+
+首次安装请按 [macOS 部署与 PlayCover 设置](../docs/develop/setup/macos.md) 操作：包含源码环境、PlayCover 图像与游戏设置、系统权限、手柄组件和首次准备游戏。图像设置为 **Resizable（可缩放）＋自定义长宽比 1920:1080＋缩放 1.0**。
 
 Mac 已适配日常任务、自动战斗与部分周常；具体范围看任务卡片及 [迁移进度](../docs/develop/zzz/macos_migration_progress.md)。运行时保持游戏与一条龙在同一桌面，运行实例选“仅运行当前”，“结束后”选“无”。
 
 首次运行迷失之地前，须按部署指南完成 [手柄镜头校准](../docs/develop/setup/macos.md#手柄镜头校准迷失之地必做)。普通体力战斗无需先校准，缺少镜头参数时会自动关闭本次战斗的周期转向。
+
+### 已安装用户更新
+
+退出一条龙 GUI、CLI 和联调进程，在原项目目录打开终端，先检查仓库状态：
+
+```shell
+git remote get-url origin
+git branch --show-current
+git status --short
+```
+
+确认 `origin` 为 `https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS.git`、当前分支为 `main`，且状态输出为空后，再更新：
+
+```shell
+git pull --ff-only origin main
+```
+
+如果本次更新包含 `pyproject.toml` 或 `uv.lock` 的变动，再同步依赖；普通代码更新可跳过：
+
+```shell
+uv sync --frozen --python 3.11
+```
+
+完成后重新打开原启动入口，或在项目目录运行：
+
+```shell
+PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main
+```
+
+账户、任务计划、运行记录和本机配置会保留，普通代码更新无需重装 OJD、重新授权或重建本机启动应用。有本地改动、来源不符或无法快进时，先保留改动并按 [更新说明](../docs/develop/setup/macos.md#更新已有安装) 处理，不要强制覆盖。
+
+**旧版本 GUI 的「代码同步」曾指向上游，可能覆盖 Mac 适配代码，首次获取此修复请使用上述终端步骤。** 修复后的 **资源管理 → 资源 → Mac 版代码同步** 仅从 Aurxs 的 Mac 仓库更新；自动模式和地区预设也不会切换到上游代码源。依赖变更仍需在终端同步，Mac 不提供 Windows 启动器下载。
+
+如果已经更新错版本，或通过 GitHub「Download ZIP」获取源码，请按 [更新异常处理](../docs/develop/setup/macos.md#更新错版本或没有-git-元数据) 恢复。
 
 ## 📸 页面预览
 
@@ -91,7 +125,7 @@ Mac 已适配日常任务、自动战斗与部分周常；具体范围看任务�
 
 </div>
 
-## 📢 官方渠道
+## 📢 上游官方渠道
 
 <div>
 

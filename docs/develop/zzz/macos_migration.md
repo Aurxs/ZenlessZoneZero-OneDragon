@@ -2,7 +2,7 @@
 
 状态：当前桌面、默认调查专项的单次实战模拟室完整自动流程已通过，包含导航、出战、战斗、结算和返回大世界；GUI 热切换与默认已保存账号的完整冷启动均已实机通过，原体力计划已接入；七项日常任务仍在推进，不能视为全项目迁移完成。各项是否通过见 [实施进度](macos_migration_progress.md)。日期：2026-10-25。代码基线：`8fe22ef0cf127f596ba6b28047416fb68dacc797`。以下接口与阶段描述是设计，不表示已经全部实现。
 
-已完成仓库准备：[Aurxs fork](https://github.com/Aurxs/ZenlessZoneZero-OneDragon) 已创建；本地工作目录保持不变，`origin` 指向 fork，`upstream` 指向 [原仓库](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon)，主仓与测试仓均已创建 `codex/macos-migration` 分支。未删除原目录、配置或资源。按用户授权，将完成并验证的组件在主仓与测试仓配对提交 checkpoint。
+已完成仓库准备：[Aurxs fork](https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS) 已创建；本地工作目录保持不变，`origin` 指向 fork，`upstream` 指向 [原仓库](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon)，主仓与测试仓均已创建 `codex/macos-migration` 分支。未删除原目录、配置或资源。按用户授权，将完成并验证的组件在主仓与测试仓配对提交 checkpoint。
 
 近期手柄项目的版本、源码证据和限制集中记录在 [macOS 原生手柄方案调研](macos_gamepad_research.md)，本文不重复展开项目调查。
 

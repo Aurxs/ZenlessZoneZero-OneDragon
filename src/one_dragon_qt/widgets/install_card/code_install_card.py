@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable
 
 from PySide6.QtGui import QIcon
@@ -66,7 +67,8 @@ class CodeInstallCard(BaseInstallCard):
         elif status is GitSyncStatus.REMOTE_UNAVAILABLE:
             message = f'{msg}, {gt("请稍后重试或切换代码源")}'
         elif status is GitSyncStatus.LOCAL_CHANGES:
-            message = f'{msg}, {gt("可开启“强制更新”后重试")}'
+            hint = '请先保存本地改动，再在终端更新' if sys.platform == 'darwin' else '可开启“强制更新”后重试'
+            message = f'{msg}, {gt(hint)}'
         elif status is GitSyncStatus.LOCAL_UPDATE_FAILED:
             message = f'{msg}, {gt("请重启后重试；仍然失败时请重新安装")}'
         elif status is GitSyncStatus.FAILED:
@@ -109,6 +111,10 @@ class CodeInstallCard(BaseInstallCard):
                 icon = FluentIcon.INFO.icon(color=FluentThemeColor.GOLD.value)
 
             if self.updated:
-                msg += ' ' + gt('更新后需重启脚本生效。如不能运行，请更新启动器')
+                hint = (
+                    '更新后需重启；依赖变更请在终端执行 uv sync --frozen --python 3.11'
+                    if sys.platform == 'darwin' else '更新后需重启脚本生效。如不能运行，请更新启动器'
+                )
+                msg += ' ' + gt(hint)
 
             return icon, msg

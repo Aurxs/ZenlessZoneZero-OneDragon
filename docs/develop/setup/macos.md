@@ -31,13 +31,75 @@
 首次部署到新目录：
 
 ```shell
-git clone --branch main https://github.com/Aurxs/ZenlessZoneZero-OneDragon.git
-cd ZenlessZoneZero-OneDragon
+git clone --branch main https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS.git
+cd ZenlessZoneZero-OneDragon-MacOS
 uv sync --frozen --python 3.11
 PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main
 ```
 
 日常在仓库根目录执行最后一行即可，无需重复安装依赖或克隆测试仓。
+
+### 更新已有安装
+
+本 Mac 版从 `https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS.git` 的 `main` 分支获取已发布到该分支的代码。仓库已改名，已有本地安装目录无需改名，旧 `origin` 地址按下方异常处理更新即可。**旧版本 GUI 的代码源曾指向上游，首次获取代码源修复请使用下面的终端步骤。**
+
+1. 退出一条龙 GUI、CLI 和联调进程，在原项目目录打开终端，检查来源、分支和本地改动：
+
+   ```shell
+   git remote get-url origin
+   git branch --show-current
+   git status --short
+   ```
+
+   应分别显示上述 Mac 仓库地址、`main`，以及空的状态输出。如果来源或分支不符，先确认当前目录是否为原 Mac 版安装目录；有本地源码改动时，先备份或自行提交，处理完成后再更新。来源已被旧 GUI 改写时，按下方异常处理恢复，不要直接强制覆盖。
+
+2. 拉取更新：
+
+   ```shell
+   git pull --ff-only origin main
+   ```
+
+   提示 `Already up to date` 表示已与远程分支一致；若提示无法快进，说明本地历史与远程分叉，需先保留本地提交并处理，不能用强制重置代替正常更新。
+
+3. 如果拉取结果包含 `pyproject.toml` 或 `uv.lock` 的变动，再同步依赖；普通代码更新跳过此步：
+
+   ```shell
+   uv sync --frozen --python 3.11
+   ```
+
+4. 重新打开原启动入口，或在项目目录执行：
+
+   ```shell
+   PYTHONPATH=src uv run --no-sync python -m zzz_od.macos.main
+   ```
+
+正常更新会保留账户、任务计划、运行记录、本机配置及已下载模型，无需重装 OJD。仓库位置、虚拟环境和 Python 未变时，普通代码更新无需重新授权或重建本机启动应用。
+
+### GUI 更新入口
+
+获取代码源修复后，打开 **资源管理 → 资源 → Mac 版代码同步**，点击 **设置** 可核对：
+
+- **代码源**为“自动”或“Mac 版（Aurxs / GitHub）”，两者都只使用 Mac 仓库，不会回退到上游 CNB/Gitee 代码。
+- **代码分支**为“Mac 主分支”（`main`）；旧配置中的普通 `test` 分支会回到 `main`，显式开启的自定义分支保留。
+- **强制更新**会丢弃本地源码改动，Mac 新配置默认关闭；已有设置保留，有源码改动时应先自行保存。
+
+停止运行中的任务后点击 **代码同步**，更新完成后重启。GUI 不会执行 `uv sync`；若本次更新修改了依赖，先退出程序，在终端同步依赖后再启动。Mac 不显示仅适用于 Windows 的启动器下载和 EXE 自动更新选项。
+
+地区预设中的 CNB/Gitee 仍可用于模型等资源下载，代码始终来自 Mac 仓库。模型资源与项目代码来源不同，不代表更新到了 Windows 版。
+
+### 更新错版本或没有 Git 元数据
+
+旧 GUI 的代码同步不读取克隆时的 `origin` 作为唯一来源，而是按 `config/repository.yml` 的代码源拉取，并将 `origin` 恢复为配置中的主仓库。旧配置的主源和备用源均为上游，且强制更新默认开启，因此可能把 Mac 代码替换为上游版本。
+
+如果 `origin` 仍是旧的 `Aurxs/ZenlessZoneZero-OneDragon.git` 地址，或只是被改写为上游、Mac 源码和本地历史仍在，退出一条龙后可先更新来源，再按上面的终端步骤更新：
+
+```shell
+git remote set-url origin https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS.git
+```
+
+如果 Mac 入口已经丢失，或恢复来源后 `git pull --ff-only` 仍无法快进，先保留并备份原目录，按首次部署步骤在另一个目录克隆并安装 Mac 版，不要强制重置或覆盖原目录。退出程序后迁移个人配置和所需模型，再核对新目录的路径及权限；不要用整份旧 `config/` 覆盖新目录，尤其不要复制旧 `config/repository.yml` 和 `config/project.yml`。
+
+通过 GitHub「Download ZIP」获取的目录没有 Git 元数据，不能直接执行 `git pull`，同样按新目录克隆的方式迁移。旧 `.venv` 和本机开发 `.app` 含原目录路径，不要直接复制复用。
 
 ## 3. 配置一条龙
 

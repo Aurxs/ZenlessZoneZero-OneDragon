@@ -1,4 +1,5 @@
 import os
+import sys
 import urllib.parse
 from enum import Enum
 
@@ -223,7 +224,7 @@ class EnvConfig(YamlConfig):
         代码是否强制更新 会直接丢弃现有的改动
         :return:
         """
-        return self.get('force_update', True)
+        return self.get('force_update', sys.platform != 'darwin')
 
     @force_update.setter
     def force_update(self, new_value: bool) -> None:
@@ -303,11 +304,13 @@ class EnvConfig(YamlConfig):
 
     @property
     def git_branch(self) -> str:
-        """
-        分支
-        :return:
-        """
-        return self.get('git_branch', self.repo_config.primary_branch)
+        """获取分支；已移除的标准分支回到主分支，保留显式自定义分支。"""
+        branch = self.get('git_branch', self.repo_config.primary_branch)
+        if self.custom_git_branch or any(
+            item.branch_name == branch for item in self.repo_config.branches
+        ):
+            return branch
+        return self.repo_config.primary_branch
 
     @git_branch.setter
     def git_branch(self, new_value: str) -> None:

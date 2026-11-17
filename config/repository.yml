@@ -3,24 +3,13 @@ repositories:
   primary_branch: main
   branches:
     main:
-      label: 主分支
-      desc: 选择后请点击同步最新代码
-    test:
-      label: 测试分支
-      desc: 选择后请点击同步最新代码
+      label: Mac 主分支
+      desc: 更新 Aurxs Mac 版 main 分支
   options:
     github:
-      label: GitHub
-      url: "https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon.git"
+      label: Mac 版（Aurxs / GitHub）
+      url: "https://github.com/Aurxs/ZenlessZoneZero-OneDragon-MacOS.git"
       use_proxy: true
-    cnb:
-      label: CNB
-      url: "https://cnb.cool/OneDragon-Anything/ZenlessZoneZero-OneDragon.git"
-      use_proxy: false
-    gitee:
-      label: Gitee
-      url: "https://gitee.com/OneDragon-Anything/ZenlessZoneZero-OneDragon.git"
-      use_proxy: false
 env_source:
   default: cnb
   options:
@@ -118,16 +107,16 @@ resource_download:
         - labels.csv
 regions:
   china_cnb:
-    label: 中国 - CNB
-    repository: cnb
+    label: 中国 - CNB 资源 / Mac 代码
+    repository: github
     values:
       env_source: "https://cnb.cool/OneDragon-Anything/OneDragon-Env/-/releases/download"
       pip_source: "https://mirrors.aliyun.com/pypi/simple"
       proxy_type: "None"
       resource_source: cnb
   china_gitee:
-    label: 中国 - Gitee
-    repository: gitee
+    label: 中国 - Gitee 资源 / Mac 代码
+    repository: github
     values:
       env_source: "https://gitee.com/OneDragon-Anything/OneDragon-Env/releases/download"
       pip_source: "https://mirrors.aliyun.com/pypi/simple"

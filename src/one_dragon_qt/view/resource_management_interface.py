@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -134,7 +135,7 @@ class ResourceManagementInterface(VerticalScrollInterface):
         content_widget.v_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.code_card = CodeInstallCard(self.ctx)
-        self.code_card.titleLabel.setText(gt('代码同步'))
+        self.code_card.titleLabel.setText(gt('Mac 版代码同步' if sys.platform == 'darwin' else '代码同步'))
         self.code_card.iconLabel.setIcon(FluentIcon.CODE)
         self.code_card.git_branch_opt.hide()
         self.code_card.finished.connect(self.on_code_updated)
@@ -159,7 +160,7 @@ class ResourceManagementInterface(VerticalScrollInterface):
         self.repository_url_opt = ComboBoxSettingCard(
             icon=FluentIcon.APPLICATION,
             title='代码源',
-            content='自动模式优先使用上次成功源',
+            content=f'更新仓库：{self.ctx.repo_config.primary_repository.label}',
             options_list=self.ctx.repo_config.repository_options,
         )
         self.repository_url_opt.value_changed.connect(lambda: self.ctx.git_service.update_remote())
@@ -167,7 +168,7 @@ class ResourceManagementInterface(VerticalScrollInterface):
         self.git_branch_opt = ComboBoxSettingCard(
             icon=FluentIcon.GITHUB,
             title='代码分支',
-            content='主分支用于稳定版本，测试分支用于提前体验新功能',
+            content='更新 Mac 版 main 分支' if sys.platform == 'darwin' else '主分支用于稳定版本，测试分支用于提前体验新功能',
             options_list=self.ctx.repo_config.branch_options,
         )
         self.git_branch_opt.value_changed.connect(self._on_git_branch_changed)
@@ -177,9 +178,11 @@ class ResourceManagementInterface(VerticalScrollInterface):
             password_hash='69fec7ebc9c57ba044c55deb4e30aa1a6d6788f1da67b824ef96a590f526d20a',
             reverse_mode=True
         )
+        self.auto_update_code_opt.setVisible(sys.platform != 'darwin')
 
         self.force_update_opt = SwitchSettingCard(
-            icon=FluentIcon.SYNC, title='强制更新', content='不懂代码请开启，会将脚本更新到最新并将你的改动覆盖，不会使你的配置失效',
+            icon=FluentIcon.SYNC, title='强制更新',
+            content='会丢弃本地源码改动；通常保持关闭，账户和任务配置保留' if sys.platform == 'darwin' else '不懂代码请开启，会将脚本更新到最新并将你的改动覆盖，不会使你的配置失效',
         )
 
         self.custom_git_branch_lineedit = LineEdit()
@@ -318,12 +321,13 @@ class ResourceManagementInterface(VerticalScrollInterface):
 
         self.download_items_group = SettingCardGroup('更新与下载')
         self.download_items_group.addSettingCard(self.code_card)
-        self.launcher_opt = LauncherDownloadCard(self.ctx)
-        self.launcher_opt.use_download_queue(
-            self.download_queue,
-            self._build_launcher_spec,
-        )
-        self.download_items_group.addSettingCard(self.launcher_opt)
+        if sys.platform != 'darwin':
+            self.launcher_opt = LauncherDownloadCard(self.ctx)
+            self.launcher_opt.use_download_queue(
+                self.download_queue,
+                self._build_launcher_spec,
+            )
+            self.download_items_group.addSettingCard(self.launcher_opt)
 
         self.ocr_opt = self._create_model_card(
             title='OCR识别',
@@ -819,7 +823,12 @@ class ResourceManagementInterface(VerticalScrollInterface):
         """仅在代码实际更新后显示重启对话框。"""
         if not success or self.code_card.last_sync_status is not GitSyncStatus.SUCCESS:
             return
-        dialog = Dialog(gt('更新完成'), gt('代码已更新，重启以应用更改'), self)
+        message = (
+            'Mac 版代码已更新。若本次更新修改了依赖，请退出程序，在项目目录执行 '
+            'uv sync --frozen --python 3.11 后重新启动；普通代码更新可直接重启。'
+            if sys.platform == 'darwin' else '代码已更新，重启以应用更改'
+        )
+        dialog = Dialog(gt('更新完成'), gt(message), self)
         dialog.setTitleBarVisible(False)
         dialog.yesButton.setText(gt('立即重启'))
         dialog.cancelButton.setText(gt('稍后重启'))
