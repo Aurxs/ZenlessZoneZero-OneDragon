@@ -10,6 +10,7 @@ from one_dragon.base.operation.application import application_const
 from zzz_od.application.charge_plan import charge_plan_const
 from zzz_od.application.city_fund import city_fund_const
 from zzz_od.application.coffee import coffee_app_const
+from zzz_od.application.email_app import email_app_const
 from zzz_od.application.engagement_reward import engagement_reward_const
 from zzz_od.application.random_play import random_play_const
 
@@ -32,6 +33,7 @@ MACOS_SUPPORTED_APP_IDS: frozenset[str] = frozenset({
     coffee_app_const.APP_ID,
     city_fund_const.APP_ID,
     engagement_reward_const.APP_ID,
+    email_app_const.APP_ID,
     'daily_signin',
     'ridu_weekly',
     'notorious_hunt',
@@ -61,6 +63,7 @@ def get_macos_app_limits(app_id: str) -> str:
         charge_plan_const.APP_ID: MACOS_CHARGE_PLAN_LIMITS,
         random_play_const.APP_ID: 'Mac 支持澄辉坪营业点、随机或按原候选配置定位并确认宣传员、推荐上架；指定仪玄分支已验，其他人物待实测，营业中不更换',
         coffee_app_const.APP_ID: 'Mac 已验证澄辉坪汀曼特调与今日已喝；其他入口和额外咖啡尚未实测',
+        email_app_const.APP_ID: 'Mac 邮件仅在 CLI 单项显式指定 --claim-all 时执行，不加入日活；不删除邮件或打开其中链接',
         engagement_reward_const.APP_ID: 'Mac 支持活跃度领奖、满档判断及已领取跳过',
         city_fund_const.APP_ID: 'Mac 支持现有成长任务与等级奖励领取，不购买等级或升级计划',
     }.get(app_id, MACOS_APP_SUMMARY)
@@ -88,6 +91,8 @@ def get_macos_one_dragon_unavailable_reason(ctx: ZContext) -> str | None:
         return 'Mac 的结束后操作暂未适配，请将「结束后」设为「无」'
 
     group = ctx.app_group_manager.get_one_dragon_group_config(ctx.current_instance_idx)
+    if any(item.enabled and item.app_id == email_app_const.APP_ID for item in group.app_list):
+        return 'Mac 邮件只支持单项手动领取，请先取消一条龙组中的邮件选项'
     unsupported = [
         item.app_name or item.app_id
         for item in group.app_list

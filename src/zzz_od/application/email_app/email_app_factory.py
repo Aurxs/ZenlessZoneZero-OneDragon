@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.application.application_factory import ApplicationFactory
@@ -18,6 +19,8 @@ class EmailAppFactory(ApplicationFactory):
     def __init__(self, ctx: ZContext):
         ApplicationFactory.__init__(self, email_app_const)
         self.ctx: ZContext = ctx
+        if sys.platform == 'darwin':
+            self.need_notify = False  # Mac 手动邮件不主动推送通知或截图。
 
     def create_application(self, instance_idx: int, group_id: str) -> Application:
         return EmailApp(self.ctx)
