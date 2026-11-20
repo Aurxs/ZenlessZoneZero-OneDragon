@@ -31,6 +31,8 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | 参数 | 作用与限制 |
 | --- | --- |
 | `-h`, `--help` | 打印帮助并退出，不创建任务上下文。 |
+| `--list-redeem-codes` | 仅用于 `--app redemption_code`，只读查询上游国服兑换码目录，不创建游戏上下文。 |
+| `--redeem-code CODE` | 仅用于实际运行 `--app redemption_code`，只提交用户明确指定的一枚国服兑换码。 |
 | `--claim-all` | 仅与实际运行的 `--app email` 配合，明确授权此次领取所有游戏邮件附件。不加入一条龙任务组、不删除邮件、不打开邮件链接。 |
 | `--app APP_ID` | 默认 `one_dragon`；指定原注册任务，不接受未知或不可独立调用的内部任务。 |
 | `--list` | 列出注册任务的 `app_id`、`name`、`unavailable_reason`，不操作游戏。 |
@@ -39,7 +41,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | `--resume-store-refreshed` | 必须同时带 `--resume-lost-void`；只用于已确认刷新过一次的当前商店，避免重复刷新。 |
 | `--resume-signin-reward` | 仅与实际运行的 `--app daily_signin` 配合，续接已确认的当日卦象奖励/结果页。 |
 
-`--list` 与 `--dry-run` 互斥。恢复参数不能用于这两种预览模式；不把恢复参数当作忽略错误或跳过初始化的开关。参数组合错误或宿主不是 Apple Silicon macOS 时，由 argparse 退出，退出码为 2。当前账户平台错误、未知任务或不适配则返回错误 JSON，退出码为 1。
+`--list`、`--list-redeem-codes` 与 `--dry-run` 互斥。恢复参数不能用于预览模式；不把恢复参数当作忽略错误或跳过初始化的开关。参数组合错误或宿主不是 Apple Silicon macOS 时，由 argparse 退出，退出码为 2。当前账户平台错误、未知任务或不适配则返回错误 JSON，退出码为 1。
 
 `--list` 的空 `unavailable_reason` 只表示该任务的单项入口没有适配拒绝，不能保证当前资源和界面就绪；整组还需要 `--dry-run` 检查启用任务和配置。预览虽然不操作游戏，仍会创建并读取项目上下文，不是完全脱离安装环境的静态命令。
 
@@ -63,6 +65,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | --- | --- |
 | `one_dragon` | 当前账户启用的任务组；Mac 不支持多账户整组运行，结束后操作应为“无”。 |
 | `email` | 仅独立手动运行，必须加 `--claim-all`。未知结果不会重复领取；`--app email --dry-run` 不访问游戏。 |
+| `redemption_code` | 国服 Mac 单项手动兑换，不加入日活；只在原生手柄表单核对指定码及唯一兑换焦点后提交一次。 |
 | `daily_signin` | 当前 Mac 卦象签到适配；不假设其他签到地点已支持。 |
 | `random_play`, `coffee` | 录像店与咖啡；核对当前地点、配置及是否已完成。 |
 | `charge_plan` | 原体力计划；核对副本、卡数、编队、消耗、恢复设置与预览限制。 |
@@ -78,6 +81,15 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 ```sh
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli --app email --claim-all
 ```
+
+国服兑换码示例：
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli --app redemption_code --list-redeem-codes
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli --app redemption_code --redeem-code CODE
+```
+
+`CODE` 是占位符。上游的国服数据只有北京时间日期，可能滞后，预览有记录不保证仍可用，找不到也不表示无效。实际兑换只用手动指定的码，不批量兑换、不打开邮件；以明确的游戏回执为准。如提交后结果不明，保留单账号的此码尝试记录，不清记录或重试。
 
 恢复只能在确认原执行停止、当前界面与已发生资源变化后使用：
 

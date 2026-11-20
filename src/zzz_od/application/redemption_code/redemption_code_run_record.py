@@ -1,10 +1,13 @@
+import os
 from dataclasses import dataclass
+from pathlib import Path
 
 from one_dragon.base.config.yaml_config import YamlConfig
 from one_dragon.base.operation.application_run_record import AppRunRecord
 from zzz_od.application.redemption_code.redemption_code_config import (
     RedemptionCodeConfig,
 )
+from zzz_od.macos.redemption_catalog import normalize_code
 
 
 @dataclass
@@ -108,3 +111,29 @@ class RedemptionCodeRunRecord(AppRunRecord):
         used = self.used_code_list
         used.append(code)
         self.used_code_list = used
+
+
+    def _macos_attempt_path(self, code: str) -> Path:
+        """记录在当前账户运行数据目录，与任务组或运行日期无关。"""
+        if self.file_path is None:
+            raise ValueError('缺少当前账户的兑换运行记录')
+        return Path(self.file_path).resolve().parent / 'macos_redemption_attempts' / (normalize_code(code) + '.txt')
+
+    def macos_code_attempted(self, code: str) -> bool:
+        """已使用或曾尝试却未收到回执时，一律不自动再次提交。"""
+        return (any(str(used).upper() == code for used in self.used_code_list)
+                or self._macos_attempt_path(code).exists())
+
+    def begin_macos_attempt(self, code: str) -> bool:
+        """按键前使用独占创建标记，其他进程不能再提交同一账户的同一码。"""
+        path = self._macos_attempt_path(code)
+        path.parent.mkdir(mode=0o700, exist_ok=True)
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            return False
+        with os.fdopen(fd, 'w', encoding='utf-8') as record:
+            record.write('submitted_or_unknown\n')
+            record.flush()
+            os.fsync(record.fileno())
+        return True
