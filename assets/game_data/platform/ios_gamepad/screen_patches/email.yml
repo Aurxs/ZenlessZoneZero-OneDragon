@@ -1,0 +1,9 @@
+screen_id: email
+added_areas:
+- area_name: 手柄-全部领取提示
+  area_type: none
+  pc_rect:
+  - 60
+  - 995
+  - 310
+  - 1065

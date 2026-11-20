@@ -121,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     """默认运行当前账户的一条龙；配置仍由原 GUI 或 YAML 管理。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app', default='one_dragon', help='原任务 ID，默认 one_dragon')
+    parser.add_argument('--claim-all', action='store_true', help='明确手动领取邮件的全部可领取附件，仅用于 --app email')
     parser.add_argument('--resume-lost-void', action='store_true', help='仅续接已确认的战线肃清中断挑战')
     parser.add_argument('--resume-store-refreshed', action='store_true', help='续接已核对刷新一次的当前商店，不再刷新')
     parser.add_argument('--resume-signin-reward', action='store_true', help='仅续接已确认的当日卦象奖励或结果页')
@@ -128,6 +129,10 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument('--list', action='store_true', help='列出已注册任务及 Mac 支持情况，不操作游戏')
     mode.add_argument('--dry-run', action='store_true', help='检查入口限制并预览已启用任务，不操作游戏')
     args = parser.parse_args(argv)
+    if args.claim_all and (args.app != 'email' or args.list or args.dry_run):
+        parser.error('--claim-all 仅用于实际运行 --app email')
+    if args.app == 'email' and not (args.list or args.dry_run or args.claim_all):
+        parser.error('Mac 邮件领取必须明确指定 --app email --claim-all')
     if args.resume_lost_void and (args.app != 'lost_void' or args.list or args.dry_run):
         parser.error('--resume-lost-void 仅用于实际运行 --app lost_void')
     if args.resume_signin_reward and (args.app != 'daily_signin' or args.list or args.dry_run):
@@ -149,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     ctx: ZContext | None = None
     try:
         ctx = ZContext()
+        ctx.macos_claim_all_mail = args.claim_all
         ctx.macos_resume_lost_void = args.resume_lost_void
         ctx.macos_resume_store_refreshed = args.resume_store_refreshed
         ctx.macos_resume_signin_reward = args.resume_signin_reward

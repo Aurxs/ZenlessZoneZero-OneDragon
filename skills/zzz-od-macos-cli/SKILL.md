@@ -31,6 +31,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | 参数 | 作用与限制 |
 | --- | --- |
 | `-h`, `--help` | 打印帮助并退出，不创建任务上下文。 |
+| `--claim-all` | 仅与实际运行的 `--app email` 配合，明确授权此次领取所有游戏邮件附件。不加入一条龙任务组、不删除邮件、不打开邮件链接。 |
 | `--app APP_ID` | 默认 `one_dragon`；指定原注册任务，不接受未知或不可独立调用的内部任务。 |
 | `--list` | 列出注册任务的 `app_id`、`name`、`unavailable_reason`，不操作游戏。 |
 | `--dry-run` | 验证账户平台及入口限制，返回当前账户、任务与限制；不初始化模型、采集或输入，不重置运行记录。 |
@@ -61,6 +62,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | ID | 作用/核对点 |
 | --- | --- |
 | `one_dragon` | 当前账户启用的任务组；Mac 不支持多账户整组运行，结束后操作应为“无”。 |
+| `email` | 仅独立手动运行，必须加 `--claim-all`。未知结果不会重复领取；`--app email --dry-run` 不访问游戏。 |
 | `daily_signin` | 当前 Mac 卦象签到适配；不假设其他签到地点已支持。 |
 | `random_play`, `coffee` | 录像店与咖啡；核对当前地点、配置及是否已完成。 |
 | `charge_plan` | 原体力计划；核对副本、卡数、编队、消耗、恢复设置与预览限制。 |
@@ -70,6 +72,12 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | `suibian_temple` | 以当前预览限制为准，不能假定随便观全部子功能可用。 |
 | `predefined_team_checker` | 同步识别到的预备编队信息，属于配置写入，先确认用户授权。 |
 | `mouse_sensitivity_checker` | Mac 摇杆校准并保存当前账户参数，属于配置写入，不当作只读状态探测。 |
+
+手动邮件示例（会领取全部当前可领的游戏邮件附件）：
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli --app email --claim-all
+```
 
 恢复只能在确认原执行停止、当前界面与已发生资源变化后使用：
 
