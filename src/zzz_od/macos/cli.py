@@ -121,15 +121,32 @@ def main(argv: list[str] | None = None) -> int:
     """默认运行当前账户的一条龙；配置仍由原 GUI 或 YAML 管理。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--app', default='one_dragon', help='原任务 ID，默认 one_dragon')
+    parser.add_argument('--redeem-code', metavar='CODE', action='append', help='仅单项兑换明确指定的一枚国服兑换码')
     parser.add_argument('--claim-all', action='store_true', help='明确手动领取邮件的全部可领取附件，仅用于 --app email')
     parser.add_argument('--resume-lost-void', action='store_true', help='仅续接已确认的战线肃清中断挑战')
     parser.add_argument('--resume-store-refreshed', action='store_true', help='续接已核对刷新一次的当前商店，不再刷新')
     parser.add_argument('--resume-signin-reward', action='store_true', help='仅续接已确认的当日卦象奖励或结果页')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--list', action='store_true', help='列出已注册任务及 Mac 支持情况，不操作游戏')
+    mode.add_argument('--list-redeem-codes', action='store_true', help='只读查看上游国服兑换码，不启动游戏')
     mode.add_argument('--dry-run', action='store_true', help='检查入口限制并预览已启用任务，不操作游戏')
     args = parser.parse_args(argv)
-    if args.claim_all and (args.app != 'email' or args.list or args.dry_run):
+    from zzz_od.macos.redemption_catalog import normalize_code
+
+    if args.list_redeem_codes and (args.app != 'redemption_code' or args.redeem_code or args.claim_all):
+        parser.error('--list-redeem-codes 仅用于单项兑换码目录预览')
+    if args.redeem_code is not None:
+        if args.app != 'redemption_code' or args.list or args.dry_run or args.list_redeem_codes:
+            parser.error('--redeem-code 仅用于实际运行 --app redemption_code')
+        try:
+            if len(args.redeem_code) != 1:
+                raise ValueError('一次只能明确提供一枚兑换码')
+            args.redeem_code = normalize_code(args.redeem_code[0])
+        except ValueError as error:
+            parser.error(str(error))
+    if args.app == 'redemption_code' and not (args.list or args.dry_run or args.list_redeem_codes or args.redeem_code):
+        parser.error('Mac 兑换码仅限手动指定 --app redemption_code --redeem-code CODE')
+    if args.claim_all and (args.app != 'email' or args.list or args.dry_run or args.list_redeem_codes):
         parser.error('--claim-all 仅用于实际运行 --app email')
     if args.app == 'email' and not (args.list or args.dry_run or args.claim_all):
         parser.error('Mac 邮件领取必须明确指定 --app email --claim-all')
@@ -141,6 +158,17 @@ def main(argv: list[str] | None = None) -> int:
         parser.error('--resume-store-refreshed 必须与 --resume-lost-void 同时使用')
     if sys.platform != 'darwin' or platform.machine().lower() not in ('arm64', 'aarch64'):
         parser.error('此入口需要 Apple Silicon macOS 和原生 arm64 Python')
+
+    if args.list_redeem_codes:
+        from zzz_od.macos.redemption_catalog import UPSTREAM_CATALOG, fetch_cn_catalog
+
+        try:
+            output = {'region': 'cn', 'source': UPSTREAM_CATALOG, 'codes': fetch_cn_catalog()}
+        except Exception as error:
+            print(json.dumps({'success': False, 'status': str(error)}, ensure_ascii=False), flush=True)
+            return 1
+        print(json.dumps(output, ensure_ascii=False, indent=2), flush=True)
+        return 0
 
     from zzz_od.context.zzz_context import ZContext
 
@@ -154,6 +182,9 @@ def main(argv: list[str] | None = None) -> int:
     ctx: ZContext | None = None
     try:
         ctx = ZContext()
+        if args.redeem_code is not None and ctx.game_account_config.game_region != 'cn':
+            raise ValueError('Mac 兑换码仅支持已配置的国服账户')
+        ctx.macos_redeem_code = args.redeem_code
         ctx.macos_claim_all_mail = args.claim_all
         ctx.macos_resume_lost_void = args.resume_lost_void
         ctx.macos_resume_store_refreshed = args.resume_store_refreshed

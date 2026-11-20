@@ -84,6 +84,7 @@ if not getattr(sys, 'frozen', False):
     import winreg
     import yaml
     import zipfile
+    from AppKit import NSData, NSPasteboard, NSPasteboardItem, NSPasteboardTypeString
     from PIL import Image, ImageDraw, ImageFont
     from PySide6 import QtCore
     from PySide6.QtCore import QAbstractListModel, QByteArray, QEasingCurve, QEvent, QEventLoop, QMimeData, QModelIndex, QObject, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QRegularExpression, QRunnable, QSize, QStandardPaths, QThread, QThreadPool, QTimer, QUrl, Qt, Signal
@@ -98,13 +99,13 @@ if not getattr(sys, 'frozen', False):
     from collections.abc import Callable, Iterable, Iterator, Sequence
     from colorama import Fore, Style, init
     from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
-    from contextlib import suppress
+    from contextlib import contextmanager, suppress
     from copy import deepcopy
     from ctypes import wintypes
     from ctypes.wintypes import DWORD, HANDLE, RECT, SHORT, UINT, WCHAR, WORD
     from cv2.typing import MatLike
     from dataclasses import asdict, dataclass, field, fields, replace
-    from datetime import date, datetime, timedelta
+    from datetime import date, datetime, timedelta, timezone
     from email.header import Header
     from email.mime.image import MIMEImage
     from email.mime.multipart import MIMEMultipart
@@ -112,12 +113,14 @@ if not getattr(sys, 'frozen', False):
     from email.utils import formataddr
     from enum import Enum, IntEnum, StrEnum
     from functools import cache, cached_property, lru_cache, partial, wraps
+    from http.client import HTTPMessage, HTTPResponse
     from importlib import metadata
     from io import BytesIO
     from logging import DEBUG
     from logging.handlers import TimedRotatingFileHandler
     from math import gcd, isfinite
     from numpy.typing import NDArray
+    from objc import autorelease_pool
     from packaging import version
     from pathlib import Path, PurePosixPath, PureWindowsPath
     from pyautogui import screenshot

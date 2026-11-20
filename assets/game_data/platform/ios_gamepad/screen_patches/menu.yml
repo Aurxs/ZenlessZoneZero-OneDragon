@@ -21,3 +21,52 @@ added_areas:
   - 905
   - 1645
   - 1065
+- area_name: 手柄-兑换码标题
+  area_type: none
+  pc_rect:
+  - 635
+  - 330
+  - 815
+  - 418
+- area_name: 手柄-兑换码字段
+  area_type: none
+  pc_rect:
+  - 750
+  - 548
+  - 1130
+  - 604
+- area_name: 手柄-兑换码字段焦点
+  area_type: none
+  pc_rect:
+  - 670
+  - 515
+  - 1250
+  - 635
+- area_name: 手柄-兑换按钮焦点
+  area_type: none
+  pc_rect:
+  - 795
+  - 660
+  - 1120
+  - 765
+- area_name: 手柄-兑换粘贴提示
+  area_type: none
+  pc_rect:
+  - 775
+  - 790
+  - 888
+  - 850
+- area_name: 手柄-兑换结果
+  area_type: none
+  pc_rect:
+  - 500
+  - 260
+  - 1420
+  - 792
+- area_name: 手柄-兑换顶部结果
+  area_type: none
+  pc_rect:
+  - 420
+  - 46
+  - 1500
+  - 284

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.application.application_factory import ApplicationFactory
@@ -23,6 +24,9 @@ class RedemptionCodeFactory(ApplicationFactory):
     def __init__(self, ctx: ZContext):
         ApplicationFactory.__init__(self, redemption_code_const)
         self.ctx: ZContext = ctx
+
+        if sys.platform == 'darwin':
+            self.need_notify = False  # Mac 单次手动兑换不主动推送。
 
     def create_application(self, instance_idx: int, group_id: str) -> Application:
         return RedemptionCodeApp(self.ctx)

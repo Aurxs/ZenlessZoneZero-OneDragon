@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+import sys
 import time
-from typing import List, Optional
+from typing import TYPE_CHECKING
 
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
-from one_dragon.base.operation.operation_notify import node_notify, NotifyTiming
+from one_dragon.base.operation.operation_notify import NotifyTiming, node_notify
 from one_dragon.base.operation.operation_round_result import OperationRoundResult
 from zzz_od.application.redemption_code import redemption_code_const
 from zzz_od.application.redemption_code.redemption_code_run_record import (
@@ -12,7 +15,11 @@ from zzz_od.application.redemption_code.redemption_code_run_record import (
 )
 from zzz_od.application.zzz_application import ZApplication
 from zzz_od.context.zzz_context import ZContext
+from zzz_od.macos.redemption_catalog import normalize_code
 from zzz_od.operation.back_to_normal_world import BackToNormalWorld
+
+if TYPE_CHECKING:
+    from one_dragon.base.operation.operation_base import OperationResult
 
 
 class RedemptionCodeApp(ZApplication):
@@ -29,12 +36,12 @@ class RedemptionCodeApp(ZApplication):
             app_id=redemption_code_const.APP_ID,
             op_name=redemption_code_const.APP_NAME,
         )
-        self.run_record: Optional[RedemptionCodeRunRecord] = self.ctx.run_context.get_run_record(
+        self.run_record: RedemptionCodeRunRecord | None = self.ctx.run_context.get_run_record(
             app_id=redemption_code_const.APP_ID,
             instance_idx=self.ctx.current_instance_idx,
         )
 
-        self.unused_code_list: List[str] = []
+        self.unused_code_list: list[str] = []
         self.code_idx: int = 0  # 当前输入兑换码的下标
 
     def handle_init(self) -> None:
@@ -44,7 +51,35 @@ class RedemptionCodeApp(ZApplication):
         """
         pass
 
-    @operation_node(name='检测新兑换码', is_start_node=True)
+    def execute(self) -> OperationResult:
+        """Mac 只接受手动指定的一枚国服兑换码，不执行 Windows 批量工作流。"""
+        if sys.platform == 'darwin':
+            code = getattr(self.ctx, 'macos_redeem_code', None)
+            if code is None or self.ctx.game_account_config.game_region != 'cn':
+                return self.op_fail('Mac 国服兑换仅限 CLI 手动使用 --app redemption_code --redeem-code CODE')
+            try:
+                code = normalize_code(code)
+                if self.run_record is None or self.run_record.macos_code_attempted(code):
+                    return self.op_fail('已有该码的使用或尝试记录，或当前账户记录不可用；未提交')
+            except (ValueError, OSError) as error:
+                return self.op_fail(str(error))
+        return super().execute()
+
+    @operation_node(name='选择兑换输入方式', is_start_node=True)
+    def choose_input_mode(self) -> OperationRoundResult:
+        return self.round_success('Mac手柄兑换' if sys.platform == 'darwin' else '原兑换流程')
+
+    @node_from(from_name='选择兑换输入方式', status='Mac手柄兑换')
+    @operation_node(name='手柄兑换一枚国服兑换码', timeout_seconds=90)
+    def run_gamepad_redemption(self) -> OperationRoundResult:
+        from zzz_od.operation.gamepad.redemption import GamepadRedeemCode
+
+        return self.round_by_op_result(
+            GamepadRedeemCode(self.ctx, self.ctx.macos_redeem_code, self.run_record).execute(),
+        )
+
+    @node_from(from_name='选择兑换输入方式', status='原兑换流程')
+    @operation_node(name='检测新兑换码')
     def check_new_code(self) -> OperationRoundResult:
         self.unused_code_list = self.run_record.get_unused_code_list(self.run_record.get_current_dt())
         if len(self.unused_code_list) == 0:

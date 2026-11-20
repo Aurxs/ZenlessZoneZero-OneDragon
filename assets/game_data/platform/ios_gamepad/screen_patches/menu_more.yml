@@ -1,0 +1,9 @@
+screen_id: menu_more
+added_areas:
+- area_name: 手柄-功能网格
+  area_type: none
+  pc_rect:
+  - 500
+  - 300
+  - 1410
+  - 895
