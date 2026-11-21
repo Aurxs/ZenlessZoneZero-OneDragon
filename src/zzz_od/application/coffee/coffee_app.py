@@ -321,6 +321,8 @@ class CoffeeApp(GamepadMenuDelayMixin, ZApplication):
 
     def _get_coffee_to_choose(self) -> list[str]:
         """获取候选咖啡，额外咖啡喝完后固定选择汀曼特调"""
+        if getattr(self.ctx, 'macos_tinman_only', False):
+            return [] if '汀曼特调' in self.had_coffee_list else ['汀曼特调']
         to_choose_list: list[str] = []
         for coffee in self.ctx.compendium_service.get_extra_coffee_list():
             if coffee.coffee_name in self.had_coffee_list:

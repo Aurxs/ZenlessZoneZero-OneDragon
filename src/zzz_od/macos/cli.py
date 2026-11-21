@@ -126,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--resume-lost-void', action='store_true', help='仅续接已确认的战线肃清中断挑战')
     parser.add_argument('--resume-store-refreshed', action='store_true', help='续接已核对刷新一次的当前商店，不再刷新')
     parser.add_argument('--resume-signin-reward', action='store_true', help='仅续接已确认的当日卦象奖励或结果页')
+    parser.add_argument('--tinman-only', action='store_true', help='仅在单项咖啡任务中选择汀曼特调')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--list', action='store_true', help='列出已注册任务及 Mac 支持情况，不操作游戏')
     mode.add_argument('--list-redeem-codes', action='store_true', help='只读查看上游国服兑换码，不启动游戏')
@@ -154,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error('--resume-lost-void 仅用于实际运行 --app lost_void')
     if args.resume_signin_reward and (args.app != 'daily_signin' or args.list or args.dry_run):
         parser.error('--resume-signin-reward 仅用于实际运行 --app daily_signin')
+    if args.tinman_only and (args.app != 'coffee' or args.list or args.dry_run):
+        parser.error('--tinman-only 仅用于实际运行 --app coffee')
     if args.resume_store_refreshed and not args.resume_lost_void:
         parser.error('--resume-store-refreshed 必须与 --resume-lost-void 同时使用')
     if sys.platform != 'darwin' or platform.machine().lower() not in ('arm64', 'aarch64'):
@@ -189,6 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         ctx.macos_resume_lost_void = args.resume_lost_void
         ctx.macos_resume_store_refreshed = args.resume_store_refreshed
         ctx.macos_resume_signin_reward = args.resume_signin_reward
+        ctx.macos_tinman_only = args.tinman_only
         # 预览只注册工厂，不调用会加载模型和刷新日记录的 init。
         ctx.register_application_factory()
         ctx.app_group_manager.set_default_apps(ctx.run_context.default_group_apps)
