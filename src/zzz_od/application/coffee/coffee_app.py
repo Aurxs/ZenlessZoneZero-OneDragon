@@ -1,6 +1,7 @@
 import difflib
 import sys
 import time
+import unicodedata
 from typing import ClassVar
 
 import cv2
@@ -239,17 +240,32 @@ class CoffeeApp(GamepadMenuDelayMixin, ZApplication):
         if area is None:
             return fail_shop_state(self, '咖啡店', '咖啡店对话选项区域未配置')
         texts = self.ctx.ocr.crop_and_run_ocr(self.last_screenshot, area.rect)
-        for coffee_name in self._get_coffee_to_choose():
+        tinman_only = getattr(self.ctx, 'macos_tinman_only', False)
+        candidates = self._get_coffee_to_choose()
+        if tinman_only:
+            # 专用模式只接受已核实的完整点单句；不接受疑问、否定或套餐。
+            def normalize_tinman_line(text: str) -> str:
+                return ''.join(unicodedata.normalize('NFKC', text).split()).removesuffix('!')
+
+            exact_matches = [(text, matches) for text, matches in texts.items()
+                             if normalize_tinman_line(text) == '请来一杯汀曼特调']
+            if candidates != ['汀曼特调'] or len(exact_matches) != 1 or len(exact_matches[0][1]) != 1:
+                return fail_shop_state(self, '咖啡店', '无法唯一确认汀曼特调完整点单选项')
+            exact_options = [exact_matches[0][0]]
+        for coffee_name in candidates:
             target = gt(coffee_name, 'game')
-            options = [text for text in texts if target in text
-                       or str_utils.find_by_lcs(target, text, percent=0.8)]
+            options = exact_options if tinman_only else [
+                text for text in texts if target in text or str_utils.find_by_lcs(target, text, percent=0.8)
+            ]
             if len(options) != 1:
                 continue
             if save_shop_frame(self, '咖啡店', f'{coffee_name}_点单前') is None:
                 return self.round_fail('未能保存咖啡点单前画面')
             self.node_clicked = True
             # 对话中的完整句子是“请来一杯汀曼特调！”，不能只把咖啡名传给精确选项匹配。
-            result = self.round_by_op_result(GamepadChooseDialogOption(self.ctx, options[0]).execute())
+            dialog = (GamepadChooseDialogOption(self.ctx, options[0], single_confirmation=True)
+                      if tinman_only else GamepadChooseDialogOption(self.ctx, options[0]))
+            result = self.round_by_op_result(dialog.execute())
             self.screenshot()
             if save_shop_frame(self, '咖啡店', f'{coffee_name}_点单后') is None:
                 return self.round_fail('未能保存咖啡点单后画面')
@@ -257,7 +273,7 @@ class CoffeeApp(GamepadMenuDelayMixin, ZApplication):
                 return result
             self.chosen_coffee = self.ctx.compendium_service.name_2_coffee[coffee_name]
             self.had_coffee_list.add(coffee_name)
-            if self.config.transport_point == CoffeeTransportPoint.POINT_3.value.value:
+            if not tinman_only and self.config.transport_point == CoffeeTransportPoint.POINT_3.value.value:
                 return self.round_success('点单后跳过', wait=1)
             return self.round_success('已点单', wait=1)
         result = press_shop_action(self, '咖啡店', '继续对话')
@@ -321,6 +337,8 @@ class CoffeeApp(GamepadMenuDelayMixin, ZApplication):
 
     def _get_coffee_to_choose(self) -> list[str]:
         """获取候选咖啡，额外咖啡喝完后固定选择汀曼特调"""
+        if getattr(self.ctx, 'macos_tinman_only', False):
+            return [] if '汀曼特调' in self.had_coffee_list else ['汀曼特调']
         to_choose_list: list[str] = []
         for coffee in self.ctx.compendium_service.get_extra_coffee_list():
             if coffee.coffee_name in self.had_coffee_list:

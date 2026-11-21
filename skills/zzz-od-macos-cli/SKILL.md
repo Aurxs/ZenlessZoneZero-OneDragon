@@ -40,6 +40,7 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -B -m zzz_od.macos.cli
 | `--resume-lost-void` | 仅与实际运行的 `--app lost_void` 配合，续接已核实的战线肃清中断挑战。 |
 | `--resume-store-refreshed` | 必须同时带 `--resume-lost-void`；只用于已确认刷新过一次的当前商店，避免重复刷新。 |
 | `--resume-signin-reward` | 仅与实际运行的 `--app daily_signin` 配合，续接已确认的当日卦象奖励/结果页。 |
+| `--tinman-only` | 仅与实际运行的 `--app coffee` 配合，限定候选为汀曼特调，不选择额外咖啡。 |
 
 `--list`、`--list-redeem-codes` 与 `--dry-run` 互斥。恢复参数不能用于预览模式；不把恢复参数当作忽略错误或跳过初始化的开关。参数组合错误或宿主不是 Apple Silicon macOS 时，由 argparse 退出，退出码为 2。当前账户平台错误、未知任务或不适配则返回错误 JSON，退出码为 1。
 

@@ -20,11 +20,15 @@ if TYPE_CHECKING:
 class GamepadChooseDialogOption(GamepadOperation):
     """逐帧移动选项，只报告已经确认的目标，不判断调用方业务完成。"""
 
-    def __init__(self, ctx: ZContext, option: str, prompt_threshold: float = 0.85) -> None:
+    def __init__(
+        self, ctx: ZContext, option: str, prompt_threshold: float = 0.85,
+        single_confirmation: bool = False,
+    ) -> None:
         """使用调用方指定的完整选项，不默认选择当前行。"""
         super().__init__(ctx, op_name=f'手柄对话选择 {option}', timeout_seconds=25)
         self.option: str = option
         self.prompt_threshold: float = prompt_threshold
+        self.single_confirmation: bool = single_confirmation
         self.evidence: dict[str, str] = {}
         self._confirm_sent: bool = False
         self._completed: bool = False
@@ -137,6 +141,11 @@ class GamepadChooseDialogOption(GamepadOperation):
         self.screenshot()
         if not self._save('选项确认后'):
             return self.round_fail('未能保存对话确认后画面')
+        if self.single_confirmation:
+            # 仅报告输入已发送；调用方必须独立核实业务结果，不再重复点单。
+            return self.round_success('确认已发送，等待业务核验', data={
+                'option': self.option, 'evidence': dict(self.evidence),
+            })
         # 交互动画中 A 可能只补全台词。新帧仍完整显示同一选项和焦点才再次确认。
         self._confirm_sent = False
         return self.round_retry('等待对话选项关闭', wait=0.5)
